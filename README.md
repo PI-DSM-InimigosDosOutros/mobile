@@ -41,10 +41,10 @@ As três abas e seus modais usam dados ilustrativos isolados em `src/data/demo-d
 
 ## Prévias de modais
 
-Há 22 visualizações acessíveis pelos botões das telas:
+Há 23 visualizações acessíveis pelos botões das telas:
 
 - **Conta / Configurações:** dados pessoais, medidas e atividade, preferências, metas e modalidades, disponibilidade, personalização, configurações, acesso e segurança, recuperação de acesso, ajuda, sobre o WorkIn e retorno ao login.
-- **Treino do dia:** detalhes do exercício, treino completo, execução, pausa, encerramento e conclusão.
+- **Treino do dia:** criação automática, detalhes do exercício, treino completo, execução, pausa, encerramento e conclusão. O botão **Criar treino** abre uma prévia com as preferências do perfil ilustrativo. Na integração, esse botão solicitará a criação ao backend, que usará as preferências salvas da conta.
 - **Treinos anteriores e indicador de sequência:** histórico completo, resumo de sessão, filtros e sequência.
 
 Os formulários reutilizam os componentes do cadastro, permanecendo somente para leitura. Ações de salvar, alterar senha, enviar recuperação e aplicar filtros estão desativadas. A visualização de um resumo completo ou parcial não registra treino nem altera a sequência. A paleta é a única configuração editável nesta etapa.

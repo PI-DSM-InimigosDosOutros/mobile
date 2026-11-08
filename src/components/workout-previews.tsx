@@ -8,10 +8,22 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatDuration, type DashboardData, type Exercise } from '@/utils/dashboard';
 import { closePreview, openPreview, replacePreview } from '@/utils/preview-navigation';
 
-export type WorkoutPreviewName = 'exercicio' | 'treino' | 'execucao' | 'pausa' | 'encerramento' | 'conclusao';
+export type WorkoutPreviewName = 'criar-treino' | 'exercicio' | 'treino' | 'execucao' | 'pausa' | 'encerramento' | 'conclusao';
 
 export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewName; data: DashboardData; id?: string }) {
   const theme = useTheme();
+  if (screen === 'criar-treino') {
+    const { goal, exerciseCategories, availableMinutesPerDay } = data.profile;
+    return <>
+      <ThemedText type="title">Seu treino, do seu jeito</ThemedText>
+      <ThemedText>O treino será montado automaticamente com as preferências do seu cadastro.</ThemedText>
+      <ThemedText type="label" accent>Preferências de exemplo</ThemedText>
+      <ThemedText>Meta: {goal}{'\n'}Modalidades: {exerciseCategories.join(', ')}{'\n'}Tempo disponível: {availableMinutesPerDay} min/dia</ThemedText>
+      <ThemedText type="technical">A criação automática ficará disponível quando o serviço de treinos estiver conectado.</ThemedText>
+      <ActionButton title="Voltar ao treino do dia" outlined onPress={closePreview} />
+    </>;
+  }
+
   const exercises = data.workout.exercises;
   const index = id ? exercises.findIndex(item => item.id === id) : 0;
   const exercise = exercises[index];

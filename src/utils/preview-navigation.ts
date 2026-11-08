@@ -5,7 +5,7 @@ export const previewTitles = {
   metas: 'Metas e modalidades', disponibilidade: 'Disponibilidade', aparencia: 'Personalização',
   configuracoes: 'Configurações', seguranca: 'Acesso e segurança', recuperacao: 'Recuperar acesso',
   ajuda: 'Ajuda com o WorkIn', sobre: 'Sobre o WorkIn', saida: 'Voltar ao login',
-  exercicio: 'Detalhes do exercício', treino: 'Treino completo', execucao: 'Prévia de execução',
+  'criar-treino': 'Criar treino', exercicio: 'Detalhes do exercício', treino: 'Treino completo', execucao: 'Prévia de execução',
   pausa: 'Treino pausado', encerramento: 'Encerrar treino', conclusao: 'Treino concluído',
   historico: 'Histórico completo', sessao: 'Resumo do treino', filtros: 'Filtros do histórico', sequencia: 'Sua sequência',
 } as const;

@@ -15,6 +15,7 @@ export default function TodayScreen() {
   const { data } = useDashboard();
   const { exercicio } = useLocalSearchParams<{ exercicio?: string }>();
   return <DashboardScreen>
+    <ActionButton title="Criar treino" icon="dumbbell" disabled={!data} onPress={() => openPreview('criar-treino')} />
     {data ? <WorkoutOverview workout={data.workout} availableMinutes={data.profile.availableMinutesPerDay} exerciseId={exercicio} /> :
       <DashboardEmpty title="Primeiro vamos ajustar seu treino pra você!" description="Seu treino do dia aparecerá aqui quando sua conta e suas preferências estiverem conectadas." />}
   </DashboardScreen>;

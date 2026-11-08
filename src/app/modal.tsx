@@ -19,7 +19,7 @@ export default function ModalScreen() {
     case 'configuracoes': case 'seguranca': case 'recuperacao': case 'ajuda': case 'sobre': case 'saida':
       content = <AccountPreview screen={screen} profile={data.profile} />;
       break;
-    case 'exercicio': case 'treino': case 'execucao': case 'pausa': case 'encerramento': case 'conclusao':
+    case 'criar-treino': case 'exercicio': case 'treino': case 'execucao': case 'pausa': case 'encerramento': case 'conclusao':
       content = <WorkoutPreview screen={screen} data={data} id={id} />;
       break;
     case 'historico': case 'sessao': case 'filtros': case 'sequencia':
