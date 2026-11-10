@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
+import * as Axios from 'axios';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { Artwork } from '@/components/artwork';
@@ -11,6 +13,28 @@ import { openPreview } from '@/utils/preview-navigation';
 
 export default function LoginScreen() {
   const theme = useTheme();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const loginHandler = () => {
+    const body = JSON.stringify({ email: email, password: password });
+    try {
+      Axios.default.post(`${process.env.EXPO_PUBLIC_API_URL}/auth/login`, body, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then((response) => {
+          console.log('Login successful:', response.data);
+          // Handle successful login, e.g., navigate to the next screen
+        })
+        .catch((error) => {
+          console.error('Login failed:', error.response?.data || error.message);
+          // Handle login failure, e.g., show an error message to the user
+        });
+    } catch (error) {
+      console.error('An unexpected error occurred:', error);
+      // Handle unexpected errors, e.g., show a generic error message
+    }
+  }
+
   return (
     <Screen code="user:login">
       <View style={styles.heading}>
@@ -40,8 +64,8 @@ export default function LoginScreen() {
         </ThemedText>
       </View>
       <View style={styles.fields}>
-        <FormField label="Usuário" placeholder="DIGITE SEU E-MAIL..." value="" />
-        <FormField label="Senha" placeholder="DIGITE SUA SENHA..." password value="" />
+        <FormField label="Usuário" placeholder="DIGITE SEU E-MAIL..." editable value={email} onChangeText={setEmail} />
+        <FormField label="Senha" placeholder="DIGITE SUA SENHA..." editable password value={password} onChangeText={setPassword} />
       </View>
       <View style={styles.helpRow}>
         <Pressable accessibilityRole="link" accessibilityLabel="Esqueci minha senha" onPress={() => openPreview('recuperacao')} style={styles.help}>
@@ -59,7 +83,7 @@ export default function LoginScreen() {
         <View style={styles.signIn}>
           <Artwork name="stripes" width={60} height={60} />
           <View style={styles.grow}>
-            <ActionButton title="Entrar" icon="dumbbell" />
+            <ActionButton title="Entrar" icon="dumbbell" onPress={loginHandler}/>
           </View>
         </View>
         <ThemedText type="technical" style={[styles.developmentNotice, { color: theme.textSecondary }]}>LAYOUT ESTÁTICO · LOGIN AINDA NÃO INTEGRADO</ThemedText>

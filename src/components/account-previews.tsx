@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import * as Axios from 'axios';
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { AccentPalette } from '@/components/accent-palette';
@@ -13,6 +15,28 @@ import { profileToDraft, type RegistrationProfile } from '@/utils/registration';
 export type AccountPreviewName = 'dados' | 'medidas' | 'preferencias' | 'metas' | 'disponibilidade' | 'aparencia' | 'configuracoes' | 'seguranca' | 'recuperacao' | 'ajuda' | 'sobre' | 'saida';
 
 export function AccountPreview({ screen, profile }: { screen: AccountPreviewName; profile: RegistrationProfile }) {
+  
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const handleRecovery = ()=>{
+    const body = JSON.stringify({ email: recoveryEmail });
+    try {
+      Axios.default.post(`${process.env.EXPO_PUBLIC_API_URL}/user/forgot-password`, body, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then((response) => {
+          console.log('Password recovery successful:', response.data);
+          // Handle successful password recovery, e.g., navigate to the next screen
+        })
+        .catch((error) => {
+          console.error('Password recovery failed:', error.response?.data || error.message);
+          // Handle password recovery failure, e.g., show an error message to the user
+        });
+    } catch (error) {
+      console.error('An unexpected error occurred:', error);
+      // Handle unexpected errors, e.g., show a generic error message
+    }
+  }
+  
   const draft = profileToDraft(profile);
   switch (screen) {
     case 'dados': return <>
@@ -61,8 +85,8 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       <Artwork name="arrow" width={70} />
       <ThemedText type="title">Vamos recuperar seu acesso</ThemedText>
       <ThemedText>Esta é a prévia do formulário de recuperação. Nenhuma mensagem será enviada nesta versão.</ThemedText>
-      <FormField label="E-mail da conta" placeholder="SEU E-MAIL..." value="" />
-      <ActionButton title="Enviar instruções" />
+      <FormField label="E-mail da conta" placeholder="SEU E-MAIL..." value={recoveryEmail} onChangeText={setRecoveryEmail} editable />
+      <ActionButton title="Enviar instruções" onPress={handleRecovery} />
     </>;
     case 'ajuda': return <>
       <ThemedText type="title">Como funciona?</ThemedText>
