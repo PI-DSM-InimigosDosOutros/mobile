@@ -12,7 +12,10 @@ export default function ModalScreen() {
   const params = useLocalSearchParams<{ tela?: string; id?: string }>();
   const screen = typeof params.tela === 'string' && Object.hasOwn(previewTitles, params.tela) ? params.tela as keyof typeof previewTitles : null;
   const id = typeof params.id === 'string' ? params.id : undefined;
-  if (!data) return <PreviewModal title="Dados indisponíveis"><ThemedText>Não há informações para esta visualização.</ThemedText></PreviewModal>;
+  if (!data && (screen === 'recuperacao' || screen === 'aparencia' || screen === 'sobre' || screen === 'ajuda')) {
+    return <PreviewModal title={previewTitles[screen]}><AccountPreview screen={screen} /></PreviewModal>;
+  }
+  if (!data) return <PreviewModal title="Entre na sua conta"><ThemedText>Entre na sua conta ou abra a demonstração para acessar esta tela.</ThemedText></PreviewModal>;
   let content;
   switch (screen) {
     case 'dados': case 'medidas': case 'preferencias': case 'metas': case 'disponibilidade': case 'aparencia':

@@ -8,6 +8,8 @@ export type Exercise = {
   estimatedSeconds: number;
   description: string;
   gifUrl: string | null;
+  completed?: boolean;
+  order?: number;
 };
 export type DailyWorkout = { id: string; title: string; date: string; exercises: Exercise[] };
 export type WorkoutSession = {
@@ -55,4 +57,10 @@ export function ageFromBirthDate(birthDate: string, today = new Date()) {
   const [year, month, day] = birthDate.split('-').map(Number);
   const beforeBirthday = today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day);
   return today.getFullYear() - year - (beforeBirthday ? 1 : 0);
+}
+
+export type HistoryFilters = { status: 'all' | 'completed' | 'ended'; from: string; to: string };
+export function filterSessionHistory(sessions: WorkoutSession[], filters: HistoryFilters) {
+  return sessions.filter(session => (filters.status === 'all' || session.status === filters.status)
+    && (!filters.from || session.date >= filters.from) && (!filters.to || session.date <= filters.to));
 }

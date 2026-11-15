@@ -1,81 +1,72 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { adaptBackendWorkout, BackendWorkoutResponse } from './workoutAdapter';
-import { adaptFinishedWorkout, BackendFinishWorkoutResponse } from './historyAdapter';
+import { readSession, isAuthSession } from './session';
+import { adaptBackendWorkout, type BackendWorkoutResponse } from './workoutAdapter';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-
-async function getAuthHeaders() {
-  // TOKEN MOCKADO PROVISÓRIO (Forçado diretamente no código para testes no App e Web)
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhbmEuc291emFAZW1haWwuY29tIiwibmFtZSI6IkFuYSBTb3V6YSIsImlhdCI6MTc5NDQxMTkzMCwiZXhwIjoxNzk0NDE1NTMwfQ.oX3LzrPHD5jzhjiv7cc89jqVMxq55eyaqL7HoiH98CE";
-
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+export class ApiError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
-async function handleResponse(response: Response) {
-  if (response.status === 401) {
-    throw new Error('Sessão expirada. Faça login novamente.');
-  }
-
-  if (!response.ok) {
-    throw new Error(`Erro na requisição: ${response.status}`);
-  }
-
-  return response.json();
+export function apiUrl(path: string) {
+  const configured = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
+  if (!configured) throw new ApiError('Configure o endereço do servidor para conectar sua conta.');
+  const base = configured.endsWith('/api') ? configured : `${configured}/api`;
+  return `${base}/${path.replace(/^\/+/, '')}`;
 }
 
-// --- AS 4 APIs DO SEU ESCOPO ---
+async function request<T>(path: string, body?: object, authenticated = false): Promise<T> {
+  const url = apiUrl(path);
+  const session = authenticated ? await readSession() : null;
+  if (authenticated && !session) throw new ApiError('Entre na sua conta para continuar.', 401);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: controller.signal,
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (response.status === 401) throw new ApiError(authenticated ? 'Sua sessão expirou. Entre novamente.' : 'E-mail ou senha inválidos.', 401);
+      if (response.status === 404) throw new ApiError(path === 'wod' || path.startsWith('workout/')
+        ? 'Não há treino disponível para hoje.' : 'Esta operação não foi encontrada no servidor.', 404);
+      throw new ApiError(response.status >= 500 ? 'O servidor não conseguiu concluir a ação. Tente novamente.' : 'Revise os dados informados e tente novamente.', response.status);
+    }
+    if (!json || json.success !== true) throw new ApiError('O servidor retornou uma resposta inesperada.');
+    return json.data as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(controller.signal.aborted ? 'O servidor demorou para responder. Tente novamente.' : 'Não foi possível conectar. Confira sua conexão e o endereço do servidor.');
+  } finally { clearTimeout(timeout); }
+}
 
-// 1. Buscar o treino do dia
+export async function login(email: string, password: string) {
+  const result = await request<unknown>('auth/login', { email: email.trim(), password });
+  if (!isAuthSession(result)) throw new ApiError('A resposta de login está incompleta.');
+  return result;
+}
+export async function recoverPassword(email: string) {
+  await request('user/forgot-password', { email: email.trim() });
+}
+export async function resetPassword(token: string, newPassword: string) {
+  await request('user/reset-password', { token, newPassword });
+}
 export async function fetchDailyWorkout() {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/api/wod`, {
-    method: 'GET',
-    headers,
-  });
-
-  const json = await handleResponse(response);
-  return adaptBackendWorkout(json.data as BackendWorkoutResponse);
+  return adaptBackendWorkout(await request<BackendWorkoutResponse>('wod', undefined, true));
 }
-
-// 2. Iniciar a sessão de treino
-export async function startWorkoutSession(dailyWorkoutId: number | string) {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/api/workout/start`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ dailyWorkoutId }),
-  });
-
-  const json = await handleResponse(response);
-  return json.data;
+export async function startWorkoutSession() {
+  return request<{ dailyWorkoutId: number; firstExercise: { exerciseOrder: number } | null }>('workout/start', {}, true);
 }
-
-// 3. Avançar o progresso do treino
-export async function advanceWorkoutProgress(sessionId: string, exerciseOrder: number) {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/api/workout/progress`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ sessionId, exerciseOrder }),
-  });
-
-  return handleResponse(response);
+export async function advanceWorkoutProgress() {
+  return request<{ isFinished: boolean; nextExercise: { exerciseOrder: number } | null }>('workout/progress', {}, true);
 }
-
-// 4. Encerrar a sessão de treino e retornar o resumo adaptado
-export async function endWorkoutSession(sessionId: string) {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/api/workout/finish`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ sessionId }),
-  });
-
-  const json = await handleResponse(response);
-  
-  // Retorna a sessão adaptada para preencher a tela de resumo automaticamente
-  return adaptFinishedWorkout(json.data as BackendFinishWorkoutResponse);
+export async function endWorkoutSession() {
+  return request<{ dailyWorkoutId: number; totalDurationMinutes: number; exercisesCompleted: number; totalExercises: number }>('workout/finish', {}, true);
 }

@@ -13,12 +13,12 @@ import { formatDate } from '@/utils/dashboard';
 import { openPreview } from '@/utils/preview-navigation';
 
 export function DashboardScreen({ children }: PropsWithChildren) {
-  const { data } = useDashboard();
+  const { data, isDemo } = useDashboard();
   const theme = useTheme();
   return (
     <Screen code="user:home" dashboard>
       <ThemedText type="technical">seja bem-vindo(a), <ThemedText type="technical" accent>{data ? data.profile.fullName.split(' ')[0] : 'seu próximo movimento começa aqui'}...</ThemedText></ThemedText>
-      <ThemedText type="technical" accent>LAYOUT ESTÁTICO · DADOS ILUSTRATIVOS</ThemedText>
+      <ThemedText type="technical" accent>{isDemo ? 'DEMONSTRAÇÃO · DADOS ILUSTRATIVOS' : 'SUA CONTA · WORKIN'}</ThemedText>
       <StreakPanel />
       <View style={styles.tabs} accessibilityRole="tablist">
         <TabTrigger name="today" asChild><MenuTab>Treino do dia</MenuTab></TabTrigger>
@@ -27,8 +27,8 @@ export function DashboardScreen({ children }: PropsWithChildren) {
       </View>
       {children}
       <View style={[styles.footer, { borderColor: theme.border }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voltar ao login" onPress={() => router.dismissTo('/')} style={styles.link}>
-          <ThemedText type="technical">VOLTAR AO LOGIN ↗</ThemedText>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sair" onPress={() => openPreview('saida')} style={styles.link}>
+          <ThemedText type="technical">SAIR ↗</ThemedText>
         </Pressable>
       </View>
     </Screen>
@@ -48,17 +48,17 @@ function MenuTab({ children, isFocused, ...props }: TabTriggerSlotProps) {
 }
 
 function StreakPanel() {
-  const { data } = useDashboard();
+  const { data, isDemo } = useDashboard();
   const theme = useTheme();
   const labels = { completed: 'concluído', ended: 'encerrado manualmente', scheduled: 'programado', rest: 'sem treino programado' };
   return (
     <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes da sequência" onPress={() => openPreview('sequencia')}
       style={[styles.streak, { backgroundColor: theme.field }]}>
       <View style={styles.streakHeading}>
-        <ThemedText style={[styles.streakNumber, { color: theme.onField }]}>{data?.currentStreak ?? '—'}</ThemedText>
+        <ThemedText style={[styles.streakNumber, { color: theme.onField }]}>{isDemo ? data?.currentStreak : '—'}</ThemedText>
         <View style={styles.grow}>
           <ThemedText type="label" style={{ color: theme.onField }}>Dias{ '\n' }em sequência</ThemedText>
-          <ThemedText type="technical" style={[styles.streakCaption, { color: theme.onField }]}>{data ? 'DIAS PROGRAMADOS CONCLUÍDOS' : 'HISTÓRICO AINDA NÃO CONECTADO'}</ThemedText>
+          <ThemedText type="technical" style={[styles.streakCaption, { color: theme.onField }]}>{isDemo ? 'DIAS PROGRAMADOS CONCLUÍDOS' : 'SEQUÊNCIA AGUARDA HISTÓRICO DA CONTA'}</ThemedText>
         </View>
       </View>
       <View style={styles.week}>
@@ -72,7 +72,7 @@ function StreakPanel() {
           </View>
         ))}
       </View>
-      {data && <ThemedText type="technical" style={[styles.weekLegend, { color: theme.onField }]}>
+      {data && data.week.length > 0 && <ThemedText type="technical" style={[styles.weekLegend, { color: theme.onField }]}>
         {formatDate(data.week[0].date).slice(0, 5)} a {formatDate(data.week[data.week.length - 1].date).slice(0, 5)}{'\n'}
         ✓ concluído · / encerrado · ○ programado · · descanso
       </ThemedText>}
@@ -92,7 +92,7 @@ export function DashboardEmpty({ title, description }: { title: string; descript
     <View style={styles.emptyHeading}><Artwork name="corners" width={64} /><ThemedText type="title" style={styles.emptyTitle}>{title}</ThemedText></View>
     <ThemedText>{description}</ThemedText>
     <ActionButton title="Criar conta" outlined onPress={() => router.replace('/cadastro')} />
-    <ThemedText type="technical">Layout estático, sem conexão com uma conta ou registro de atividade física.</ThemedText>
+    <ThemedText type="technical">Seu perfil reúne as informações para personalizar os treinos.</ThemedText>
     <Artwork name="checker" width={160} height={44} />
   </View>;
 }

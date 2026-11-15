@@ -4,20 +4,20 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type Props = { title: string; onPress?: () => void; outlined?: boolean; icon?: 'arrow' | 'dumbbell'; disabled?: boolean; loading?: boolean };
-export function ActionButton({ title, onPress, outlined, icon = 'arrow', disabled, loading }: Props) {
+type Props = { title: string; onPress?: () => void; outlined?: boolean; icon?: 'arrow' | 'dumbbell'; disabled?: boolean; loading?: boolean; loadingTitle?: string };
+export function ActionButton({ title, onPress, outlined, icon = 'arrow', disabled, loading, loadingTitle = 'Aguarde...' }: Props) {
   const theme = useTheme();
   const color = outlined ? theme.accent : theme.onAccent;
   const inactive = Boolean(disabled || loading || !onPress);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={loading ? 'Enviando cadastro' : title}
+    <Pressable accessibilityRole="button" accessibilityLabel={loading ? loadingTitle : title}
       aria-disabled={inactive} aria-busy={loading}
       accessibilityState={{ disabled: inactive, busy: loading }} disabled={inactive}
       onPress={onPress} style={({ pressed }) => [styles.button, {
       borderColor: theme.accent, backgroundColor: outlined ? 'transparent' : theme.accent, opacity: pressed || disabled || loading ? 0.6 : 1,
     }]}>
       <View style={[styles.line, { borderColor: color }]}>
-        <ThemedText type="label" style={[styles.title, { color }]}>{loading ? 'Enviando...' : title}</ThemedText>
+        <ThemedText type="label" style={[styles.title, { color }]}>{loading ? loadingTitle : title}</ThemedText>
         <View style={icon === 'dumbbell' && styles.dumbbell}>
           <Artwork name={icon} width={20} height={24} color={color} />
         </View>

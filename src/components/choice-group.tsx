@@ -31,7 +31,7 @@ export function ChoiceGroup({ label, options, selected, onSelect, multiple, disa
           );
         })}
       </View>
-      {error && <ThemedText accessibilityLiveRegion="polite" style={{ color: theme.error, fontSize: 14 }}>{error}</ThemedText>}
+      {Boolean(error) && <ThemedText accessibilityLiveRegion="polite" style={{ color: theme.error, fontSize: 14 }}>{error}</ThemedText>}
     </View>
   );
 }

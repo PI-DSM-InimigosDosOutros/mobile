@@ -23,7 +23,8 @@ export function AccentPalette({ disabled, error }: Props) {
         ))}
       </View>
       <ThemedText type="technical" accent>Cor selecionada: {accentColors.find(color => color.value === value)?.name}</ThemedText>
-      {error && <ThemedText style={{ color: theme.error }}>{error}</ThemedText>}
+      {Boolean(error) && <ThemedText style={{ color: theme.error }}>{error}</ThemedText>}
+      {Boolean(theme.persistenceMessage) && <ThemedText accessibilityRole="alert" type="technical">{theme.persistenceMessage}</ThemedText>}
     </View>
   );
 }

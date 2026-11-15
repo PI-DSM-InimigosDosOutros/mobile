@@ -6,6 +6,8 @@ import { useEffect } from 'react';
 import { Colors } from '@/constants/theme';
 import { DashboardProvider } from '@/hooks/use-dashboard';
 import { ThemeProvider } from '@/hooks/use-theme';
+import { SessionProvider, useSession } from '@/hooks/use-session';
+import { RegistrationProvider } from '@/hooks/use-registration';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -26,12 +28,23 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <DashboardProvider>
+      <SessionProvider>
+        <AppNavigation />
+      </SessionProvider>
+    </ThemeProvider>
+  );
+}
+
+function AppNavigation() {
+  const { session } = useSession();
+  return (
+    <DashboardProvider key={session?.token ?? 'guest'}>
+      <RegistrationProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
           <Stack.Screen name="modal" options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
         </Stack>
-      </DashboardProvider>
-    </ThemeProvider>
+      </RegistrationProvider>
+    </DashboardProvider>
   );
 }

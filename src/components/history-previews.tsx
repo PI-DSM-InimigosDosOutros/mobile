@@ -5,24 +5,45 @@ import { FormField } from '@/components/form-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDuration, type DashboardData } from '@/utils/dashboard';
-import { openPreview } from '@/utils/preview-navigation';
+import { formatDate, formatDuration, filterSessionHistory, type HistoryFilters, type DashboardData } from '@/utils/dashboard';
+import { openPreview, closePreview } from '@/utils/preview-navigation';
+import { useState } from 'react';
+import { useDashboard } from '@/hooks/use-dashboard';
+import { birthDateToISO, formatBirthDate } from '@/utils/registration';
 
 export type HistoryPreviewName = 'historico' | 'sessao' | 'filtros' | 'sequencia';
 
 export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewName; data: DashboardData; id?: string }) {
   const theme = useTheme();
+  const dashboard = useDashboard();
+  const [filter, setFilter] = useState(dashboard.filters.status);
+  const [from, setFrom] = useState(dashboard.filters.from ? formatDate(dashboard.filters.from) : '');
+  const [to, setTo] = useState(dashboard.filters.to ? formatDate(dashboard.filters.to) : '');
+  const [message, setMessage] = useState('');
+  const filtered = filterSessionHistory(data.history, dashboard.filters);
+  const labels = { all: 'Todos', completed: 'Concluídos', ended: 'Encerrados' };
+
+  function applyFilters() {
+    const fromISO = from ? birthDateToISO(from) : '';
+    const toISO = to ? birthDateToISO(to) : '';
+    if (fromISO === null || toISO === null || (fromISO && toISO && fromISO > toISO)) {
+      setMessage('Informe datas válidas, com o início anterior ao fim.');
+      return;
+    }
+    dashboard.setFilters({ status: filter, from: fromISO, to: toISO });
+    closePreview();
+  }
   switch (screen) {
     case 'historico': return <>
       <ThemedText type="title">Cada treino conta</ThemedText>
       <ActionButton title="Visualizar filtros" outlined onPress={() => openPreview('filtros')} />
-      {data.history.map(session => <Pressable key={session.id} accessibilityRole="button" accessibilityLabel={`Ver sessão de ${formatDate(session.date)}`}
+      {filtered.map(session => <Pressable key={session.id} accessibilityRole="button" accessibilityLabel={`Ver sessão de ${formatDate(session.date)}`}
         onPress={() => openPreview('sessao', session.id)} style={[styles.row, { borderColor: theme.border }]}>
         <ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText>
         <ThemedText type="label">{session.title}</ThemedText>
         <ThemedText type="technical">{session.status === 'completed' ? '✓ CONCLUÍDO' : '/ ENCERRADO MANUALMENTE'} · {formatDuration(session.durationSeconds)}</ThemedText>
       </Pressable>)}
-      {!data.history.length && <ThemedText>Ainda não há sessões disponíveis.</ThemedText>}
+      {!filtered.length && <ThemedText>Nenhuma sessão corresponde aos filtros.</ThemedText>}
     </>;
     case 'sessao': {
       const session = id ? data.history.find(item => item.id === id) : data.history[0];
@@ -30,6 +51,7 @@ export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewNam
       const completed = session.exercises.filter(exercise => exercise.completed);
       const average = completed.length ? completed.reduce((sum, exercise) => sum + exercise.durationSeconds, 0) / completed.length : 0;
       return <>
+        {session.id.startsWith('local-') && <ThemedText type="technical">Tempos medidos nesta prática; tempos de conclusões anteriores não são recuperados. O resumo fica nesta abertura do app. Histórico definitivo e sequência dependem do serviço da conta.</ThemedText>}
         <ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText>
         <ThemedText type="title">{session.title}</ThemedText>
         <ThemedText>{session.status === 'completed' ? 'Treino concluído integralmente.' : 'Treino encerrado manualmente. Não incrementa a sequência.'}</ThemedText>
@@ -45,16 +67,18 @@ export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewNam
     }
     case 'filtros': return <>
       <ThemedText type="title">Encontre seus treinos</ThemedText>
-      <ChoiceGroup label="Situação" options={['Todos', 'Concluídos', 'Encerrados']} selected={['Todos']} />
-      <FormField label="Data inicial" placeholder="DD/MM/AAAA" value="" required={false} />
-      <FormField label="Data final" placeholder="DD/MM/AAAA" value="" required={false} />
-      <ThemedText>Esta tela mostra a organização dos filtros. A seleção e a aplicação serão implementadas posteriormente.</ThemedText>
-      <ActionButton title="Aplicar filtros" />
+      <ChoiceGroup label="Situação" options={Object.values(labels)} selected={[labels[filter]]} onSelect={value => setFilter((Object.keys(labels) as HistoryFilters['status'][]).find(key => labels[key] === value)!)} />
+      <FormField label="Data inicial" placeholder="DD/MM/AAAA" value={from} editable onChangeText={value => setFrom(formatBirthDate(value))} keyboardType="number-pad" required={false} />
+      <FormField label="Data final" placeholder="DD/MM/AAAA" value={to} editable onChangeText={value => setTo(formatBirthDate(value))} keyboardType="number-pad" required={false} />
+      {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
+      <ActionButton title="Aplicar filtros" onPress={applyFilters} />
+      <ActionButton title="Limpar filtros" outlined onPress={() => { dashboard.setFilters({ status: 'all', from: '', to: '' }); setFilter('all'); setFrom(''); setTo(''); setMessage(''); }} />
     </>;
     case 'sequencia': {
       const status = { completed: '✓ Concluído', ended: '/ Encerrado manualmente', scheduled: '○ Programado', rest: '· Sem treino programado' };
       return <>
-        <ThemedText type="title" accent>{data.currentStreak} dias em sequência</ThemedText>
+        <ThemedText type="title" accent>{dashboard.isDemo ? `${data.currentStreak} dias em sequência` : 'Cada treino conta'}</ThemedText>
+        {!dashboard.isDemo && <ThemedText>A sequência da conta estará disponível quando o histórico e os dias programados forem fornecidos pelo servidor.</ThemedText>}
         {data.week.map(day => <View key={day.date} style={[styles.detail, { borderColor: theme.border }]}>
           <ThemedText type="technical">{formatDate(day.date)}</ThemedText><View style={styles.grow}><ThemedText style={styles.right}>{status[day.status]}</ThemedText></View>
         </View>)}

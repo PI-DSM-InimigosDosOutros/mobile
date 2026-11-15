@@ -12,17 +12,22 @@ import { formatDate, formatDuration, type DailyWorkout } from '@/utils/dashboard
 import { openPreview } from '@/utils/preview-navigation';
 
 export default function TodayScreen() {
-  const { data } = useDashboard();
+  const { data, loading, error, refresh } = useDashboard();
   const { exercicio } = useLocalSearchParams<{ exercicio?: string }>();
   return <DashboardScreen>
     <ActionButton title="Criar treino" icon="dumbbell" disabled={!data} onPress={() => openPreview('criar-treino')} />
-    {data ? <WorkoutOverview workout={data.workout} availableMinutes={data.profile.availableMinutesPerDay} exerciseId={exercicio} /> :
+    {loading && <ThemedText accessibilityLiveRegion="polite">Carregando seu treino...</ThemedText>}
+    {Boolean(error) && <ThemedText accessibilityRole="alert">{error}</ThemedText>}
+    {Boolean(error) && <ActionButton title="Tentar novamente" outlined loading={loading} onPress={() => void refresh()} />}
+    {data && data.workout.exercises.length > 0 ? <WorkoutOverview workout={data.workout} availableMinutes={data.profile.availableMinutesPerDay} exerciseId={exercicio} /> :
+      data ? <ThemedText>Seu treino aparecerá aqui quando estiver disponível na sua conta.</ThemedText> :
       <DashboardEmpty title="Primeiro vamos ajustar seu treino pra você!" description="Seu treino do dia aparecerá aqui quando sua conta e suas preferências estiverem conectadas." />}
   </DashboardScreen>;
 }
 
 function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: DailyWorkout; availableMinutes: number; exerciseId?: string }) {
   const theme = useTheme();
+  const { isDemo } = useDashboard();
   const index = Math.max(0, workout.exercises.findIndex(item => item.id === exerciseId));
   const exercise = workout.exercises[index];
   const duration = workout.exercises.reduce((sum, item) => sum + item.estimatedSeconds, 0);
@@ -30,7 +35,7 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
   const muscles = [...new Set(workout.exercises.flatMap(item => item.muscles))];
   return <View style={styles.section}>
     <SectionHeading title={workout.title} />
-    <ThemedText type="technical">TREINO ILUSTRATIVO · {formatDate(workout.date)}</ThemedText>
+    <ThemedText type="technical">{isDemo ? 'TREINO ILUSTRATIVO' : 'TREINO DO DIA'} · {formatDate(workout.date)}</ThemedText>
     <View style={styles.tags}>{categories.map(category => <View key={category} style={[styles.tag, { backgroundColor: theme.accent }]}>
       <ThemedText type="technical" style={{ color: theme.onAccent }}>{category.toUpperCase()}</ThemedText>
     </View>)}</View>
@@ -38,7 +43,7 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
       <View style={[styles.metric, { borderColor: theme.border }]}><ThemedText type="title" accent>{formatDuration(duration)}</ThemedText><ThemedText type="technical">TEMPO ESTIMADO</ThemedText></View>
       <View style={[styles.metric, { borderColor: theme.border }]}><ThemedText type="title">{workout.exercises.length.toString().padStart(2, '0')}</ThemedText><ThemedText type="technical">EXERCÍCIOS</ThemedText></View>
     </View>
-    <ThemedText type="technical">Grupos: {muscles.join(' · ')}{'\n'}Disponibilidade do perfil de exemplo: {availableMinutes} min/dia.</ThemedText>
+    <ThemedText type="technical">Grupos: {muscles.join(' · ')}{availableMinutes > 0 ? `\nDisponibilidade: ${availableMinutes} min/dia.` : ''}</ThemedText>
     <View style={styles.sequence}>
       <Pressable accessibilityRole="button" accessibilityLabel="Exercício anterior" disabled={index === 0} aria-disabled={index === 0}
         onPress={() => router.setParams({ exercicio: workout.exercises[index - 1].id })}
@@ -73,7 +78,7 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
       <ActionButton title="Revisar treino" icon="dumbbell" onPress={() => openPreview('treino')} />
     </View></View>
     <ActionButton title="Visualizar execução" onPress={() => openPreview('execucao', exercise.id)} />
-    <ThemedText type="technical">As telas de execução, pausa e conclusão são prévias. Não há contagem de tempo nem registro de atividade.</ThemedText>
+    <ThemedText type="technical">Abra a execução para iniciar e acompanhar os exercícios. Na demonstração, os dados são apenas ilustrativos.</ThemedText>
   </View>;
 }
 const styles = StyleSheet.create({

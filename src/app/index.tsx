@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { router } from 'expo-router';
-import * as Axios from 'axios';
+import { login } from '@/services/api';
+import { useSession } from '@/hooks/use-session';
+import { useDashboard } from '@/hooks/use-dashboard';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { Artwork } from '@/components/artwork';
@@ -15,24 +17,28 @@ export default function LoginScreen() {
   const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const loginHandler = () => {
-    const body = JSON.stringify({ email: email, password: password });
-    try {
-      Axios.default.post(`${process.env.EXPO_PUBLIC_API_URL}/auth/login`, body, {
-        headers: { 'Content-Type': 'application/json' },
-      })
-        .then((response) => {
-          console.log('Login successful:', response.data);
-          // Handle successful login, e.g., navigate to the next screen
-        })
-        .catch((error) => {
-          console.error('Login failed:', error.response?.data || error.message);
-          // Handle login failure, e.g., show an error message to the user
-        });
-    } catch (error) {
-      console.error('An unexpected error occurred:', error);
-      // Handle unexpected errors, e.g., show a generic error message
+  const { signIn } = useSession();
+  const dashboard = useDashboard();
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const sending = useRef(false);
+  const loginHandler = async () => {
+    if (sending.current) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || !password) {
+      setMessage('Informe um e-mail válido e sua senha.');
+      return;
     }
+    sending.current = true;
+    setLoading(true);
+    setMessage('');
+    try {
+      await signIn(await login(email, password));
+      dashboard.leaveDemo();
+      setPassword('');
+      router.replace('/(preview)/treino');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível entrar. Tente novamente.');
+    } finally { sending.current = false; setLoading(false); }
   }
 
   return (
@@ -83,10 +89,10 @@ export default function LoginScreen() {
         <View style={styles.signIn}>
           <Artwork name="stripes" width={60} height={60} />
           <View style={styles.grow}>
-            <ActionButton title="Entrar" icon="dumbbell" onPress={loginHandler}/>
+            <ActionButton title="Entrar" icon="dumbbell" loading={loading} loadingTitle="Entrando..." onPress={loginHandler}/>
           </View>
         </View>
-        <ThemedText type="technical" style={[styles.developmentNotice, { color: theme.textSecondary }]}>LAYOUT ESTÁTICO · LOGIN AINDA NÃO INTEGRADO</ThemedText>
+        {Boolean(message) && <ThemedText accessibilityRole="alert" style={{ color: theme.error }}>{message}</ThemedText>}
         <View style={styles.register}>
           <ThemedText type="label" style={styles.registerText}>
             <ThemedText type="label" accent style={styles.registerText}>E SE AINDA NÃO COMEÇOU </ThemedText>SUA EXPERIÊNCIA CONOSCO
@@ -94,7 +100,7 @@ export default function LoginScreen() {
           <ActionButton title="Criar conta" outlined onPress={() => router.push('/cadastro')} />
         </View>
       </View>
-      {__DEV__ && <Pressable accessibilityRole="link" style={styles.preview} onPress={() => router.push('/(preview)/treino')}>
+      {__DEV__ && <Pressable accessibilityRole="link" style={styles.preview} onPress={() => { dashboard.enterDemo(); router.push('/(preview)/treino'); }}>
         <ThemedText type="technical" style={[styles.underline, { color: theme.textSecondary }]}>DESENVOLVIMENTO: PRÉVIA DAS TELAS →</ThemedText>
       </Pressable>}
     </Screen>

@@ -1,9 +1,13 @@
 import { Redirect } from 'expo-router';
 import { Tabs, TabList, TabTrigger, TabSlot } from 'expo-router/ui';
 import { StyleSheet } from 'react-native';
+import { useDashboard } from '@/hooks/use-dashboard';
+import { ThemedText } from '@/components/themed-text';
 
 export default function PreviewLayout() {
-  if (!__DEV__) return <Redirect href="/" />;
+  const { ready, session, isDemo } = useDashboard();
+  if (!ready) return <ThemedText>Recuperando sua sessão...</ThemedText>;
+  if (!session && !isDemo) return <Redirect href="/" />;
   return (
     <Tabs style={styles.root} options={{ backBehavior: 'history' }}>
       <TabList style={styles.hidden} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

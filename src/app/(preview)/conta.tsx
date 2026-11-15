@@ -25,7 +25,7 @@ function AccountContent({ profile }: { profile: RegistrationProfile }) {
     <View style={styles.identity}>
       <View style={styles.identityText}>
         <ThemedText type="title" accessibilityRole="header" style={styles.name}>{profile.fullName}</ThemedText>
-        <ThemedText type="technical" accent>PERFIL DE DEMONSTRAÇÃO</ThemedText>
+        <ThemedText type="technical" accent>SEU PERFIL</ThemedText>
         <Pressable style={styles.edit} accessibilityRole="button" accessibilityLabel="Visualizar edição dos dados pessoais" onPress={() => openPreview('dados')}>
           <Artwork name="pencil" width={18} /><ThemedText type="technical" accent>EDITAR DADOS</ThemedText>
         </Pressable>
@@ -38,30 +38,30 @@ function AccountContent({ profile }: { profile: RegistrationProfile }) {
     <ActionButton title="Configurações" outlined onPress={() => openPreview('configuracoes')} />
     <SectionHeading title="Sobre você" />
     <View style={styles.facts}>
-      <Fact label="Idade" value={`${ageFromBirthDate(profile.birthDate)} anos`} />
-      <Fact label="Altura" value={`${profile.heightCm} cm`} />
-      <Fact label="Peso" value={`${profile.weightKg} kg`} />
-      <Fact label="Nascimento" value={formatDate(profile.birthDate)} />
+      <Fact label="Idade" value={profile.birthDate ? `${ageFromBirthDate(profile.birthDate)} anos` : 'Não informado'} />
+      <Fact label="Altura" value={profile.heightCm ? `${profile.heightCm} cm` : 'Não informada'} />
+      <Fact label="Peso" value={profile.weightKg ? `${profile.weightKg} kg` : 'Não informado'} />
+      <Fact label="Nascimento" value={profile.birthDate ? formatDate(profile.birthDate) : 'Não informado'} />
     </View>
-    <Fact label="Gênero" value={profile.gender} />
+    <Fact label="Gênero" value={profile.gender || 'Não informado'} />
     <Fact label="E-mail" value={profile.email} />
     <Fact label="Atividade física" value={profile.activityLevel ?? 'Não informada'} />
     <Fact label="Observações médicas" value={profile.medicalNotes ?? 'Não informadas'} />
     <ActionButton title="Visualizar medidas e atividade" outlined onPress={() => openPreview('medidas')} />
     <SectionHeading title="Metas e preferências" />
     <ThemedText type="technical" accent>OBJETIVO {'>>>>>>>>'}</ThemedText>
-    <ThemedText>{profile.goal}</ThemedText>
+    <ThemedText>{profile.goal || 'Meta ainda não disponível na conta.'}</ThemedText>
     <ThemedText type="technical" accent>MODALIDADES {'>>>>>>'}</ThemedText>
     <View style={styles.tags}>{profile.exerciseCategories.map(category => <View key={category} style={[styles.tag, { backgroundColor: theme.accent }]}>
       <ThemedText type="technical" style={{ color: theme.onAccent }}>{category}</ThemedText>
     </View>)}</View>
-    <Fact label="Tempo disponível" value={`${profile.availableMinutesPerDay} minutos por dia`} />
-    <Fact label="Dias de treino" value={profile.availableDays.map(day => weekDays[day - 1]).join(' · ')} />
+    <Fact label="Tempo disponível" value={profile.availableMinutesPerDay ? `${profile.availableMinutesPerDay} minutos por dia` : 'Não informado'} />
+    <Fact label="Dias de treino" value={profile.availableDays.map(day => weekDays[day - 1]).join(' · ') || 'Não informados'} />
     <ActionButton title="Editar preferências" outlined onPress={() => openPreview('preferencias')} />
     <SectionHeading title="Aparência" />
     <AccentPalette />
     <ActionButton title="Abrir personalização" outlined onPress={() => openPreview('aparencia')} />
-    <ThemedText type="technical">A cor acompanha as telas nesta sessão. Ao recarregar, volta ao verde-lima.</ThemedText>
+    <ThemedText type="technical">A cor fica salva neste dispositivo.</ThemedText>
   </View>;
 }
 
