@@ -40,15 +40,18 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
     finally { busy.current = false; setPending(false); }
   }
 
-  function savePreview(step: number) {
+  async function savePreview(step: number) {
+    if (busy.current) return;
     const value = { ...draft, accentColor: theme.accent };
     const validation = validateRegistrationStep(value, step);
     setErrors(validation);
     if (Object.keys(validation).length) { setMessage('Revise os campos indicados.'); return; }
+    busy.current = true; setPending(true);
     try {
-      dashboard.updateDemoProfile(toProfilePayload(value));
-      setMessage('Alteração aplicada à demonstração nesta sessão.');
-    } catch { setMessage('Revise os dados do perfil antes de continuar.'); }
+      await dashboard.updateDemoProfile(toProfilePayload(value));
+      setMessage('Alteração salva neste dispositivo.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o perfil local.'); }
+    finally { busy.current = false; setPending(false); }
   }
   const editProps = {
     draft, errors,
@@ -62,11 +65,11 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
     case 'dados': return <>
       <PersonalStep {...editProps} />{feedback}
       <ActionButton title="Ver medidas e atividade" outlined onPress={() => openPreview('medidas')} />
-      <ActionButton title={dashboard.isDemo ? 'Aplicar na demonstração' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(0) : undefined} />
+      <ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(0) : undefined} />
     </>;
-    case 'medidas': return <><PhysicalStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Aplicar na demonstração' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(1) : undefined} /></>;
-    case 'metas': return <><PreferencesStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Aplicar na demonstração' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(2) : undefined} /></>;
-    case 'disponibilidade': return <><AvailabilityStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Aplicar na demonstração' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(3) : undefined} /></>;
+    case 'medidas': return <><PhysicalStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(1) : undefined} /></>;
+    case 'metas': return <><PreferencesStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(2) : undefined} /></>;
+    case 'disponibilidade': return <><AvailabilityStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(3) : undefined} /></>;
     case 'preferencias': return <>
       <ThemedText type="title">Seu treino,{ '\n' }seu ritmo.</ThemedText>
       <ThemedText>Confira os grupos de informações usados para personalizar seus próximos treinos.</ThemedText>
@@ -92,6 +95,7 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       ]} />
     </>;
     case 'seguranca': return <>
+      {dashboard.isDemo && <ThemedText type="technical">O modo local não usa senha. Recuperação e redefinição de acesso atuam somente na conta do servidor.</ThemedText>}
       <ThemedText type="label">E-mail da conta</ThemedText>
       <FormField label="E-mail" value={profile?.email ?? ''} />
       <ThemedText type="label">Alterar senha</ThemedText>
@@ -115,7 +119,7 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       <ThemedText type="label">02 · Seu treino</ThemedText>
       <ThemedText>Treino do dia apresenta a sequência, a duração estimada e os grupos musculares. Confirme o início para acompanhar o tempo, pausar e concluir cada exercício.</ThemedText>
       <ThemedText type="label">03 · Seu progresso</ThemedText>
-      <ThemedText>Treinos anteriores diferencia sessões concluídas e encerradas manualmente. Os resumos desta prática ficam disponíveis enquanto o app está aberto; a demonstração inclui exemplos identificados.</ThemedText>
+      <ThemedText>Treinos anteriores diferencia sessões concluídas e encerradas manualmente. No modo local, perfil e resumos ficam salvos neste dispositivo. Na conta real, o histórico definitivo ainda está em integração.</ThemedText>
       <ActionButton title="Entender a sequência" outlined onPress={() => openPreview('sequencia')} />
     </>;
     case 'sobre': return <>
@@ -127,7 +131,7 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
     </>;
     case 'saida': return <>
       <ThemedText type="title">Voltar ao início?</ThemedText>
-      <ThemedText>Ao sair, sua sessão será removida deste dispositivo.</ThemedText>
+      <ThemedText>Ao sair, a sessão da conta será removida. Os dados do modo local permanecem neste dispositivo para continuar depois.</ThemedText>
       <ActionButton title="Continuar nas telas" onPress={closePreview} />
       <ActionButton title="Sair da conta" outlined loading={pending} onPress={async () => {
         if (busy.current) return;

@@ -21,5 +21,5 @@ export function replacePreview(tela: PreviewScreenName, id?: string) {
 
 export function closePreview() {
   if (router.canGoBack()) router.back();
-  else router.replace('/');
+  else router.replace('/(preview)/treino');
 }

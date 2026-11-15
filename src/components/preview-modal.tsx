@@ -11,7 +11,7 @@ import { useDashboard } from '@/hooks/use-dashboard';
 
 export function PreviewModal({ title, children }: PropsWithChildren<{ title: string }>) {
   const theme = useTheme();
-  const { isDemo, session } = useDashboard();
+  const { isDemo, session, storageError } = useDashboard();
   useFocusEffect(useCallback(() => {
     if (Platform.OS !== 'web') return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -38,7 +38,8 @@ export function PreviewModal({ title, children }: PropsWithChildren<{ title: str
         </View>
         <ScrollView testID="preview-modal-scroll" style={styles.scroll} contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
-          <ThemedText type="technical" accent>{isDemo ? 'DEMONSTRAÇÃO · DADOS ILUSTRATIVOS' : session ? 'SUA CONTA · WORKIN' : 'WORKIN · SEU PRÓXIMO MOVIMENTO'}</ThemedText>
+          <ThemedText type="technical" accent>{isDemo ? 'MODO LOCAL · MOCK · NESTE DISPOSITIVO' : session ? 'SUA CONTA · WORKIN' : 'WORKIN · SEU PRÓXIMO MOVIMENTO'}</ThemedText>
+          {Boolean(storageError) && <ThemedText accessibilityRole="alert">{storageError}</ThemedText>}
           {children}
           <ThemedText type="technical" accent style={styles.footer}>{'// WorkIn: preview'}</ThemedText>
         </ScrollView>

@@ -31,7 +31,7 @@ function HistoryContent({ data }: { data: DashboardData }) {
     <View style={styles.overview}>
       <View style={[styles.receipt, { backgroundColor: theme.field }]}>
         <View style={styles.receiptTitle}><ThemedText type="label" style={{ color: theme.onField }}>Resumo:</ThemedText><Artwork name="history" width={22} color={theme.onField} /></View>
-        <ThemedText type="technical" style={[styles.receiptCaption, { color: theme.onField }]}>{isDemo ? 'SESSÕES DA DEMONSTRAÇÃO' : 'RESUMOS DESTA ABERTURA'}</ThemedText>
+        <ThemedText type="technical" style={[styles.receiptCaption, { color: theme.onField }]}>{isDemo ? 'SESSÕES DO MOCK LOCAL' : 'RESUMOS DESTA ABERTURA'}</ThemedText>
         <View style={[styles.receiptLine, { borderColor: theme.onField }]} />
         <ThemedText style={[styles.receiptText, { color: theme.onField }]}>{data.history.length} sessões registradas{'\n'}{summary.completed} concluídas{'\n'}{summary.ended} encerrada(s) antes do fim</ThemedText>
         <ThemedText type="technical" style={{ color: theme.onField }}>Último registro:{'\n'}{mostRecent ? formatDate(mostRecent.date) : '—'}</ThemedText>

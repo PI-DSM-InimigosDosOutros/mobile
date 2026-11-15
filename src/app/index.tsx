@@ -32,8 +32,9 @@ export default function LoginScreen() {
     setLoading(true);
     setMessage('');
     try {
-      await signIn(await login(email, password));
-      dashboard.leaveDemo();
+      const session = await login(email, password);
+      await dashboard.leaveDemo();
+      await signIn(session);
       setPassword('');
       router.replace('/(preview)/treino');
     } catch (error) {
@@ -93,6 +94,7 @@ export default function LoginScreen() {
           </View>
         </View>
         {Boolean(message) && <ThemedText accessibilityRole="alert" style={{ color: theme.error }}>{message}</ThemedText>}
+        {Boolean(dashboard.storageError) && <ThemedText accessibilityRole="alert">{dashboard.storageError}</ThemedText>}
         <View style={styles.register}>
           <ThemedText type="label" style={styles.registerText}>
             <ThemedText type="label" accent style={styles.registerText}>E SE AINDA NÃO COMEÇOU </ThemedText>SUA EXPERIÊNCIA CONOSCO
@@ -100,8 +102,14 @@ export default function LoginScreen() {
           <ActionButton title="Criar conta" outlined onPress={() => router.push('/cadastro')} />
         </View>
       </View>
-      {__DEV__ && <Pressable accessibilityRole="link" style={styles.preview} onPress={() => { dashboard.enterDemo(); router.push('/(preview)/treino'); }}>
-        <ThemedText type="technical" style={[styles.underline, { color: theme.textSecondary }]}>DESENVOLVIMENTO: PRÉVIA DAS TELAS →</ThemedText>
+      {__DEV__ && <Pressable accessibilityRole="link" style={styles.preview} disabled={loading} onPress={async () => {
+        if (sending.current) return;
+        sending.current = true; setLoading(true);
+        try { await dashboard.enterDemo(); router.push('/(preview)/treino'); }
+        catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível abrir o modo local.'); }
+        finally { sending.current = false; setLoading(false); }
+      }}>
+        <ThemedText type="technical" style={[styles.underline, { color: theme.textSecondary }]}>DESENVOLVIMENTO: ABRIR MODO LOCAL →</ThemedText>
       </Pressable>}
     </Screen>
   );

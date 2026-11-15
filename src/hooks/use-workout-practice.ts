@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { advanceWorkoutProgress, endWorkoutSession, startWorkoutSession } from '@/services/api';
 import type { DailyWorkout, WorkoutSession } from '@/utils/dashboard';
 
-type Practice = {
+export type Practice = {
   workoutId: string;
   index: number;
   durations: number[];
@@ -25,6 +25,15 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     setError('');
     setPending(false);
     busy.current = false;
+  }, []);
+
+  const restore = useCallback((saved: Practice | null, workout: DailyWorkout, savedAt: number) => {
+    if (!saved || saved.workoutId !== workout.id || saved.durations.length !== workout.exercises.length
+      || saved.completed.length !== workout.exercises.length || saved.index < 0 || saved.index >= workout.exercises.length) return;
+    // Ao reabrir, retoma pausado sem contar o tempo em que o aplicativo estava fechado.
+    const durations = [...saved.durations];
+    if (saved.runningSince !== null) durations[saved.index] += Math.max(0, (savedAt - saved.runningSince) / 1000);
+    setPractice({ ...saved, durations, runningSince: null });
   }, []);
 
   useEffect(() => {
@@ -139,6 +148,6 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
 
   const elapsed = practice ? (practice.durations[practice.index] || 0)
     + (practice.runningSince === null ? 0 : Math.max(0, Math.floor((now - practice.runningSince) / 1000))) : 0;
-  return { practice, summary, pending, error, elapsed, begin, pause, resume, advance, finish, reset };
+  return { practice, summary, pending, error, elapsed, checkpoint: Math.floor(now / 2000), begin, pause, resume, advance, finish, reset, restore };
 }
 

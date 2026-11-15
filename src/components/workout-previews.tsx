@@ -17,6 +17,8 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
   const dashboard = useDashboard();
   const session = dashboard.practice;
   const current = session.practice;
+  const [message, setMessage] = useState('');
+  const [creating, setCreating] = useState(false);
   const notice = session.error ? <ThemedText accessibilityRole="alert">{session.error}</ThemedText> : null;
   async function finish() {
     const result = await session.finish();
@@ -27,9 +29,17 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
     return <>
       <ThemedText type="title">Seu treino, do seu jeito</ThemedText>
       <ThemedText>O treino será montado automaticamente com as preferências do seu cadastro.</ThemedText>
-      <ThemedText type="label" accent>{dashboard.isDemo ? "Preferências de exemplo" : "Preferências da conta"}</ThemedText>
+      <ThemedText type="label" accent>{dashboard.isDemo ? "Preferências do perfil local" : "Preferências da conta"}</ThemedText>
       <ThemedText>Meta: {goal || 'Ainda não informada'}{'\n'}Modalidades: {exerciseCategories.join(', ') || 'Ainda não informadas'}{'\n'}Tempo disponível: {availableMinutesPerDay > 0 ? `${availableMinutesPerDay} min/dia` : 'Ainda não informado'}</ThemedText>
-      <ThemedText type="technical">A geração de um novo treino aguarda a operação de criação e o cadastro de preferências no servidor.</ThemedText>
+      <ThemedText type="technical">{dashboard.isDemo ? 'Geração simulada com catálogo ilustrativo, modalidades selecionadas e limite de tempo. Não é prescrição de treino. O resultado fica neste dispositivo.' : 'A geração aguarda a operação de criação e as preferências no servidor.'}</ThemedText>
+      {dashboard.isDemo && <ActionButton title="Criar treino local" loading={creating} disabled={Boolean(current)} onPress={async () => {
+        setCreating(true); setMessage('');
+        try { await dashboard.createWorkout(); closePreview(); }
+        catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar o treino.'); }
+        finally { setCreating(false); }
+      }} />}
+      {Boolean(current) && <ThemedText>Encerre o treino em andamento antes de criar outro.</ThemedText>}
+      {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
       <ActionButton title="Voltar ao treino do dia" outlined onPress={closePreview} />
     </>;
   }

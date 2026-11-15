@@ -19,18 +19,13 @@ Use `npm run android`, `npm run ios` ou `npm run web` conforme o dispositivo. O 
 
 ## Estado atual
 
-- Login com `POST /api/auth/login`, armazenamento da sessão e envio do JWT nos pedidos autenticados. Sair remove a sessão e os dados em memória. A senha não é armazenada.
-- Recuperação com `POST /api/user/forgot-password` e redefinição em `/reset-password?token=...` com `POST /api/user/reset-password`. O envio do e-mail depende da configuração de e-mail do servidor e do endereço de retorno correto.
-- Cadastro interativo em cinco etapas, com validação, campos preservados entre etapas e revisão final. **Não cria uma conta ainda:** o endpoint atual aceita apenas dados básicos, sem medidas, metas, modalidades e disponibilidade. O envio completo precisa desse alinhamento.
-- Treino do dia consultado por `GET /api/wod`, com carregamento, erro, tentativa manual e tratamento de treino vazio. A ordem, conclusão, duração estimada e GIF são adaptados da resposta existente.
-- Início, conclusão de exercício e finalização usam `POST /api/workout/start`, `/api/workout/progress` e `/api/workout/finish`. O cronômetro, a pausa e a retomada são locais. Uma falha de progresso exige consultar novamente antes de repetir a conclusão, porque a operação atual do backend não é idempotente.
-- Resumos distinguem conclusão integral e encerramento manual. Os tempos são medidos nesta prática e os resumos ficam **somente em memória enquanto o app está aberto**. Tempos de exercícios concluídos em outra prática não são recuperados. O servidor atual não persiste esses tempos nem um histórico completo de sessões.
-- Filtros por situação e intervalo de datas funcionam sobre as sessões disponíveis em memória. Indicadores de sequência da conta aguardam o histórico; não recebem valores fictícios.
-- A cor de destaque é aplicada imediatamente e salva neste dispositivo com AsyncStorage. Não é enviada à conta. Falhas de armazenamento são informadas na paleta.
-- Dados do perfil mostram apenas o que o login fornece. Os demais campos ficam sem informação. A edição é habilitada apenas na demonstração e vale durante aquela abertura do app.
+Há dois modos explícitos: **conta real**, com as chamadas existentes em `src/services/api.ts`, e **modo local (mock)**, com perfil, preferências, geração ilustrativa, prática recuperável e histórico salvos por AsyncStorage. Na web, o armazenamento é localStorage. Uma falha da API não troca automaticamente para o mock.
 
-A prática e o rascunho de cadastro não sobrevivem ao fechamento/recarregamento do aplicativo. Os campos de senha ficam apenas em memória durante o preenchimento. A sessão usa o AsyncStorage já presente no projeto; não foi adicionada uma dependência de armazenamento seguro nesta etapa.
+O cadastro completo agora permite criar um perfil local de teste. Não cria usuário no servidor nem guarda senha. O rascunho também é salvo, excluindo senha e confirmação. A entrada de desenvolvimento recupera o perfil salvo e, sem perfil, inicia a demonstração com exemplos. A cor permanece salva por dispositivo.
 
+Login, recuperação, redefinição de senha, consulta do treino, início, progresso e finalização usam a API no modo de conta real. Cadastro completo, edição de perfil, geração e histórico definitivo continuam dependendo dos contratos descritos abaixo. Na conta real, resumos novos ainda ficam em memória; o armazenamento do mock é separado.
+
+O catálogo local é ilustrativo e não interpreta medidas, metas ou observações para prescrever exercícios. Geração, perfil, resumos e sequência estão centralizados para facilitar a substituição pelos serviços futuros. Consulte **[MOCK-E-INTEGRACAO.md](MOCK-E-INTEGRACAO.md)** para os objetos, campos, arquivos e pontos de troca.
 ## Pendências do contrato com o backend
 
 | Contexto | O que falta |

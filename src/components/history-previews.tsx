@@ -51,7 +51,7 @@ export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewNam
       const completed = session.exercises.filter(exercise => exercise.completed);
       const average = completed.length ? completed.reduce((sum, exercise) => sum + exercise.durationSeconds, 0) / completed.length : 0;
       return <>
-        {session.id.startsWith('local-') && <ThemedText type="technical">Tempos medidos nesta prática; tempos de conclusões anteriores não são recuperados. O resumo fica nesta abertura do app. Histórico definitivo e sequência dependem do serviço da conta.</ThemedText>}
+        {session.id.startsWith('local-') && <ThemedText type="technical">{dashboard.isDemo ? 'Resumo salvo neste dispositivo no modo local. Não foi enviado ao servidor.' : 'Tempos medidos nesta prática; tempos de conclusões anteriores não são recuperados. O resumo fica nesta abertura do app. Histórico definitivo e sequência dependem do serviço da conta.'}</ThemedText>}
         <ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText>
         <ThemedText type="title">{session.title}</ThemedText>
         <ThemedText>{session.status === 'completed' ? 'Treino concluído integralmente.' : 'Treino encerrado manualmente. Não incrementa a sequência.'}</ThemedText>

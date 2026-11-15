@@ -7,17 +7,21 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { initialRegistration, validateRegistrationStep, type RegistrationErrors } from '@/utils/registration';
-import { useState } from 'react';
+import { initialRegistration, toProfilePayload, validateRegistrationStep, type RegistrationErrors } from '@/utils/registration';
+import { useRef, useState } from 'react';
 import { useRegistration } from '@/hooks/use-registration';
+import { useDashboard } from '@/hooks/use-dashboard';
 
 const steps = [PersonalStep, PhysicalStep, PreferencesStep, AvailabilityStep, SecurityStep];
 
 export default function RegisterScreen() {
   const theme = useTheme();
-  const { draft, setDraft } = useRegistration();
+  const { draft, setDraft, ready, storageError } = useRegistration();
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [message, setMessage] = useState('');
+  const [pending, setPending] = useState(false);
+  const busy = useRef(false);
+  const dashboard = useDashboard();
   const { etapa } = useLocalSearchParams<{ etapa?: string }>();
   const number = Number(etapa);
   const step = Number.isInteger(number) && number >= 1 && number <= 5 ? number - 1 : 0;
@@ -30,7 +34,8 @@ export default function RegisterScreen() {
     router.replace({ pathname: '/cadastro', params: { etapa: String(next + 1) } });
   }
 
-  function advance() {
+  async function advance() {
+    if (busy.current) return;
     const current = { ...draft, accentColor: theme.accent };
     const validation = validateRegistrationStep(current, step);
     setErrors(validation);
@@ -39,9 +44,17 @@ export default function RegisterScreen() {
     else {
       const invalidStep = [0, 1, 2, 3].find(index => Object.keys(validateRegistrationStep(current, index)).length > 0);
       if (invalidStep !== undefined) { navigateToStep(invalidStep); return; }
-      setMessage('Seu formulário está preenchido. O cadastro completo aguarda a integração de medidas, preferências e disponibilidade com o servidor.');
+      busy.current = true; setPending(true);
+      try {
+        await dashboard.registerLocal(toProfilePayload(current));
+        setDraft(initialRegistration);
+        router.replace('/(preview)/treino');
+      } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o perfil local.'); }
+      finally { busy.current = false; setPending(false); }
     }
   }
+
+  if (!ready) return <Screen code="user:register"><ThemedText>Recuperando seu rascunho...</ThemedText></Screen>;
 
   return (
     <Screen key={step} code="user:register" registrationStep={step}>
@@ -62,11 +75,13 @@ export default function RegisterScreen() {
         </View>
       </View>
       <ThemedText type="technical" accent>SEU CADASTRO · ETAPA {step + 1} DE 5</ThemedText>
+      <ThemedText type="technical">CADASTRO LOCAL DE TESTE · Salvo neste dispositivo. Não cria conta no servidor e não armazena sua senha.</ThemedText>
+      {Boolean(storageError) && <ThemedText accessibilityRole="alert">{storageError}</ThemedText>}
       <CurrentStep draft={{ ...draft, accentColor: theme.accent }} errors={errors} onChange={patch => { setDraft(current => ({ ...current, ...patch })); setMessage(''); }} />
       {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
       <View style={styles.actions}>
         <View style={styles.grow}>
-          <ActionButton title={step === 4 ? 'Revisar cadastro' : 'Avançar'} onPress={advance} />
+          <ActionButton title={step === 4 ? 'Criar perfil local' : 'Avançar'} loading={pending} onPress={advance} />
         </View>
         <ThemedText type="technical" accent>{String(step + 1).padStart(2, '0')} / 05</ThemedText>
       </View>

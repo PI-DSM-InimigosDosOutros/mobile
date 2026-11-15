@@ -13,12 +13,13 @@ import { formatDate } from '@/utils/dashboard';
 import { openPreview } from '@/utils/preview-navigation';
 
 export function DashboardScreen({ children }: PropsWithChildren) {
-  const { data, isDemo } = useDashboard();
+  const { data, isDemo, storageError, refresh } = useDashboard();
   const theme = useTheme();
   return (
     <Screen code="user:home" dashboard>
       <ThemedText type="technical">seja bem-vindo(a), <ThemedText type="technical" accent>{data ? data.profile.fullName.split(' ')[0] : 'seu próximo movimento começa aqui'}...</ThemedText></ThemedText>
-      <ThemedText type="technical" accent>{isDemo ? 'DEMONSTRAÇÃO · DADOS ILUSTRATIVOS' : 'SUA CONTA · WORKIN'}</ThemedText>
+      <ThemedText type="technical" accent>{isDemo ? 'MODO LOCAL · MOCK · SALVO NESTE DISPOSITIVO' : 'SUA CONTA · WORKIN'}</ThemedText>
+      {Boolean(storageError) && <><ThemedText accessibilityRole="alert">{storageError}</ThemedText><ActionButton title="Tentar salvar novamente" outlined onPress={() => void refresh()} /></>}
       <StreakPanel />
       <View style={styles.tabs} accessibilityRole="tablist">
         <TabTrigger name="today" asChild><MenuTab>Treino do dia</MenuTab></TabTrigger>

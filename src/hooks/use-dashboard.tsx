@@ -5,6 +5,8 @@ import type { RegistrationProfile } from '@/utils/registration';
 import { fetchDailyWorkout } from '@/services/api';
 import { useSession } from '@/hooks/use-session';
 import { useWorkoutPractice } from '@/hooks/use-workout-practice';
+import { readMock, saveMock } from '@/services/mock-storage';
+import { createLocalDashboard, generateMockWorkout, mockProgress, recordMockSummary } from '@/utils/mock-dashboard';
 
 function accountData(firstName: string, lastName: string, email: string): DashboardData {
   return {
@@ -20,11 +22,38 @@ function useDashboardState(initialData?: DashboardData | null) {
   const { session, ready, signOut } = useSession();
   const [data, setData] = useState<DashboardData | null>(() => initialData ?? (session ? accountData(session.user.firstName, session.user.lastName, session.user.email) : null));
   const [isDemo, setDemo] = useState(Boolean(initialData));
+  const [localReady, setLocalReady] = useState(Boolean(session || initialData));
+  const [storageError, setStorageError] = useState('');
   const [loading, setLoading] = useState(Boolean(session));
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<HistoryFilters>({ status: 'all', from: '', to: '' });
   const revision = useRef(0);
+  const persistEnabled = useRef(true);
   const practice = useWorkoutPractice(data?.workout, isDemo);
+  const { restore, checkpoint, practice: activePractice } = practice;
+
+  useEffect(() => {
+    if (session || initialData) return;
+    let active = true;
+    readMock().then(saved => {
+      if (active && saved?.active) {
+        setData(mockProgress(saved.data));
+        setDemo(true);
+        restore(saved.practice, saved.data.workout, saved.savedAt);
+      }
+    }).catch(() => { if (active) setStorageError('Não foi possível recuperar os dados locais.'); })
+      .finally(() => { if (active) setLocalReady(true); });
+    return () => { active = false; };
+  }, [session, initialData, restore]);
+
+  useEffect(() => {
+    if (!isDemo || !localReady || !data || !persistEnabled.current) return;
+    let active = true;
+    saveMock({ version: 1, active: true, savedAt: Date.now(), data, practice: activePractice })
+      .then(() => { if (active) setStorageError(''); })
+      .catch(() => { if (active) setStorageError('Não foi possível salvar os dados locais. Confira o armazenamento e tente novamente.'); });
+    return () => { active = false; };
+  }, [data, isDemo, localReady, activePractice, checkpoint]);
   const loadWorkout = useCallback(async () => {
     if (!session || isDemo) return;
     const version = ++revision.current;
@@ -48,21 +77,37 @@ function useDashboardState(initialData?: DashboardData | null) {
   }, [session, ready, isDemo]);
 
   async function refresh() {
+    if (isDemo) {
+      if (data) {
+        await saveMock({ version: 1, active: true, savedAt: Date.now(), data, practice: activePractice })
+          .then(() => setStorageError('')).catch(() => setStorageError('Não foi possível salvar os dados locais.'));
+      }
+      return;
+    }
     setLoading(true);
     setError('');
     await loadWorkout();
   }
 
-  function enterDemo() {
+  async function enterDemo() {
+    const saved = await readMock();
+    const local = saved ? mockProgress(saved.data) : mockProgress(createDemoDashboard());
+    await saveMock({ version: 1, active: true, savedAt: saved?.savedAt ?? Date.now(), data: local, practice: saved?.practice ?? null });
+    persistEnabled.current = true;
     revision.current++;
     practice.reset();
     setFilters({ status: 'all', from: '', to: '' });
-    setData(createDemoDashboard());
+    setData(local);
+    restore(saved?.practice ?? null, local.workout, saved?.savedAt ?? Date.now());
     setError('');
     setLoading(false);
     setDemo(true);
   }
-  function leaveDemo() {
+  async function leaveDemo() {
+    persistEnabled.current = false;
+    try {
+      if (isDemo && data) await saveMock({ version: 1, active: false, savedAt: Date.now(), data, practice: activePractice });
+    } catch (error) { persistEnabled.current = true; throw error; }
     revision.current++;
     practice.reset();
     setFilters({ status: 'all', from: '', to: '' });
@@ -70,14 +115,36 @@ function useDashboardState(initialData?: DashboardData | null) {
     setData(null);
   }
   async function logout() {
+    await leaveDemo();
     await signOut();
-    leaveDemo();
   }
-  function updateDemoProfile(profile: RegistrationProfile) {
-    if (isDemo) setData(current => current ? { ...current, profile } : current);
+  async function registerLocal(profile: RegistrationProfile) {
+    const saved = await readMock();
+    if (saved) throw new Error('Já existe um perfil local neste dispositivo. Abra o modo local para editar seus dados.');
+    const local = createLocalDashboard(profile);
+    await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: null });
+    persistEnabled.current = true;
+    practice.reset();
+    setData(local);
+    setDemo(true);
+  }
+  async function updateDemoProfile(profile: RegistrationProfile) {
+    if (!isDemo || !data) return;
+    const local = mockProgress({ ...data, profile });
+    await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: activePractice });
+    setData(local);
+  }
+  async function createWorkout() {
+    if (!isDemo || !data) throw new Error('A criação de treino na conta aguarda a operação do servidor.');
+    if (activePractice) throw new Error('Finalize ou encerre o treino em andamento antes de criar outro.');
+    const local = { ...data, workout: generateMockWorkout(data.profile) };
+    await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: null });
+    practice.reset();
+    setData(local);
   }
   function keepSummary(summary: NonNullable<typeof practice.summary>) {
-    // Mantém o resumo da prática nesta abertura do app. O backend ainda não oferece histórico.
+    if (isDemo) { setData(current => current ? recordMockSummary(current, summary) : current); return; }
+    // Na conta real o backend ainda não oferece histórico; os resumos ficam em memória.
     setData(current => current ? {
       ...current,
       history: [summary, ...current.history],
@@ -86,7 +153,7 @@ function useDashboardState(initialData?: DashboardData | null) {
       })) },
     } : current);
   }
-  return { data, isDemo, loading, error, ready, session, refresh, enterDemo, leaveDemo, logout, updateDemoProfile, practice, keepSummary, filters, setFilters };
+  return { data, isDemo, loading, error, storageError, ready: ready && localReady, session, refresh, enterDemo, leaveDemo, logout, registerLocal, createWorkout, updateDemoProfile, practice, keepSummary, filters, setFilters };
 }
 
 const DashboardContext = createContext<ReturnType<typeof useDashboardState> | null>(null);

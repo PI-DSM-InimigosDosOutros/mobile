@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createDemoDashboard } from '../src/data/demo-dashboard.ts';
 import { ageFromBirthDate, filterHistory, filterSessionHistory, formatDate, formatDuration, historySummary } from '../src/utils/dashboard.ts';
 import { adaptBackendWorkout } from '../src/services/workoutAdapter.ts';
+import { createLocalDashboard, generateMockWorkout, mockProgress, recordMockSummary } from '../src/utils/mock-dashboard.ts';
 import { profileToDraft, toProfilePayload } from '../src/utils/registration.ts';
 
 test('demonstração tem dados coerentes, sem simular material de exercício disponível', () => {
@@ -87,4 +88,26 @@ test('filtros de histórico combinam situação com intervalo inclusivo e aceita
   assert.deepEqual(filterSessionHistory(history, { status: 'completed', from: ended.date, to: ended.date }), []);
   assert.deepEqual(filterSessionHistory(history, { status: 'all', from: '', to: '' }), history);
   assert.deepEqual(filterSessionHistory([], { status: 'all', from: '', to: '' }), []);
+});
+
+test('treino mock usa apenas modalidades escolhidas e respeita o tempo sem modificar o perfil', () => {
+  const profile = { ...createDemoDashboard().profile, exerciseCategories: ['Yoga'], availableMinutesPerDay: 1 };
+  const workout = generateMockWorkout(profile, new Date(2026, 10, 15));
+  assert.equal(workout.date, '2026-11-15');
+  assert.ok(workout.exercises.every(item => item.category === 'Yoga' && !item.completed && item.gifUrl === null));
+  assert.ok(workout.exercises.reduce((total, item) => total + item.estimatedSeconds, 0) <= 60);
+  assert.deepEqual(profile.exerciseCategories, ['Yoga']);
+  assert.throws(() => generateMockWorkout({ ...profile, exerciseCategories: [] }), /modalidades/);
+  assert.equal(createLocalDashboard(profile).history.length, 0);
+});
+
+test('sequência local conta conclusão integral e interrompe em dia programado perdido, sem duplicar resumos', () => {
+  const data = createLocalDashboard({ ...createDemoDashboard().profile, availableDays: [1, 3, 5] });
+  const summary = { id: 'local-one', date: '2026-11-13', title: 'Teste', status: 'completed', durationSeconds: 30, exercises: [] };
+  const first = recordMockSummary(data, summary);
+  assert.equal(recordMockSummary(first, summary).history.length, 1);
+  assert.equal(mockProgress(first, new Date(2026, 10, 15)).currentStreak, 1);
+  assert.equal(mockProgress(first, new Date(2026, 10, 17)).currentStreak, 0);
+  const partial = { ...summary, status: 'ended' };
+  assert.equal(mockProgress({ ...data, history: [partial] }, new Date(2026, 10, 15)).currentStreak, 0);
 });
