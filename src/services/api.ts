@@ -1,5 +1,9 @@
 import { readSession, isAuthSession } from './session';
 import { adaptBackendWorkout, type BackendWorkoutResponse } from './workoutAdapter';
+import type { RegistrationPayload, RegistrationProfile } from '@/utils/registration';
+import type { ServerSession, WorkoutSession, WeekActivity } from '@/utils/dashboard';
+import { adaptFinishedWorkout } from './historyAdapter';
+import { adaptUserProfile, type BackendUserProfile } from './userAdapter';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -15,7 +19,7 @@ export function apiUrl(path: string) {
   return `${base}/${path.replace(/^\/+/, '')}`;
 }
 
-async function request<T>(path: string, body?: object, authenticated = false): Promise<T> {
+async function request<T>(path: string, body?: object, authenticated = false, method?: 'PUT'): Promise<T> {
   const url = apiUrl(path);
   const session = authenticated ? await readSession() : null;
   if (authenticated && !session) throw new ApiError('Entre na sua conta para continuar.', 401);
@@ -23,7 +27,7 @@ async function request<T>(path: string, body?: object, authenticated = false): P
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch(url, {
-      method: body ? 'POST' : 'GET',
+      method: method || (body ? 'POST' : 'GET'),
       headers: {
         Accept: 'application/json',
         ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -37,6 +41,7 @@ async function request<T>(path: string, body?: object, authenticated = false): P
       if (response.status === 401) throw new ApiError(authenticated ? 'Sua sessão expirou. Entre novamente.' : 'E-mail ou senha inválidos.', 401);
       if (response.status === 404) throw new ApiError(path === 'wod' || path.startsWith('workout/')
         ? 'Não há treino disponível para hoje.' : 'Esta operação não foi encontrada no servidor.', 404);
+      if ([400, 409, 422, 429].includes(response.status) && typeof json?.error === 'string') throw new ApiError(json.error, response.status);
       throw new ApiError(response.status >= 500 ? 'O servidor não conseguiu concluir a ação. Tente novamente.' : 'Revise os dados informados e tente novamente.', response.status);
     }
     if (!json || json.success !== true) throw new ApiError('O servidor retornou uma resposta inesperada.');
@@ -61,12 +66,28 @@ export async function resetPassword(token: string, newPassword: string) {
 export async function fetchDailyWorkout() {
   return adaptBackendWorkout(await request<BackendWorkoutResponse>('wod', undefined, true));
 }
-export async function startWorkoutSession() {
-  return request<{ dailyWorkoutId: number; firstExercise: { exerciseOrder: number } | null }>('workout/start', {}, true);
+export async function startWorkoutSession(dailyWorkoutId: string) {
+  return request<{ dailyWorkoutId: number; session: ServerSession }>('workout/start', { dailyWorkoutId: Number(dailyWorkoutId) }, true);
 }
-export async function advanceWorkoutProgress() {
-  return request<{ isFinished: boolean; nextExercise: { exerciseOrder: number } | null }>('workout/progress', {}, true);
+export async function advanceWorkoutProgress(sessionId: string, exerciseOrder: number, durationSeconds: number) {
+  return request<{ isFinished: boolean; nextExercise: { exerciseOrder: number } | null; session: ServerSession }>('workout/progress', { sessionId, exerciseOrder, durationSeconds }, true);
 }
-export async function endWorkoutSession() {
-  return request<{ dailyWorkoutId: number; totalDurationMinutes: number; exercisesCompleted: number; totalExercises: number }>('workout/finish', {}, true);
+export async function endWorkoutSession(sessionId: string, interruptedExercise?: { exerciseOrder: number; durationSeconds: number }) {
+  return adaptFinishedWorkout(await request<WorkoutSession>('workout/finish', { sessionId, interruptedExercise }, true));
 }
+export async function registerAccount(payload: RegistrationPayload) {
+  const result = await request<unknown>('user/register', payload);
+  if (!isAuthSession(result)) throw new ApiError('A resposta de cadastro está incompleta.');
+  return result;
+}
+export const useMockRegistration = process.env.EXPO_PUBLIC_DATA_MODE !== 'api';
+export const fetchProfile = async () => adaptUserProfile(await request<BackendUserProfile>('user/profile', undefined, true));
+export const saveProfile = async (profile: Partial<RegistrationProfile>) => adaptUserProfile(await request<BackendUserProfile>('user/profile', profile, true, 'PUT'));
+export const changePassword = (currentPassword: string, newPassword: string) => request('user/change-password', { currentPassword, newPassword }, true);
+export async function fetchHistory() {
+  const rows = await request<WorkoutSession[]>('workout/history', undefined, true);
+  if (!Array.isArray(rows)) throw new ApiError('O histórico retornado está incompleto.');
+  return rows.map(adaptFinishedWorkout);
+}
+export const fetchMetrics = () => request<{ currentStreak: number; week: WeekActivity[] }>('workout/metrics', undefined, true);
+export async function createServerWorkout() { return adaptBackendWorkout(await request<BackendWorkoutResponse>('workout/create', {}, true)); }

@@ -1,4 +1,4 @@
-export const exerciseCategories = ['Musculação', 'Aeróbica', 'Calistenia', 'Cardio', 'Yoga', 'Pilates'];
+export const exerciseCategories = ['Equilíbrio', 'Flexibilidade', 'Cardio', 'Musculação', 'HIIT', 'Calistenia'];
 export const genders = ['Feminino', 'Masculino', 'Não binário', 'Prefiro não informar'];
 export const activityLevels = ['Nunca pratiquei', 'Já pratiquei, mas parei', 'Pratico ocasionalmente', 'Pratico regularmente', 'Outro'];
 export const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
@@ -69,19 +69,26 @@ export function passwordRequirements(password: string) {
 export function validateRegistrationStep(draft: RegistrationDraft, step: number): RegistrationErrors {
   const errors: RegistrationErrors = {};
   if (step === 0) {
-    if (!draft.fullName.trim()) errors.fullName = 'Informe seu nome completo.';
+    const names = draft.fullName.trim().split(/\s+/);
+    if (names.length < 2 || !names[0] || names[0].length > 100 || names.slice(1).join(' ').length > 100) errors.fullName = 'Informe nome e sobrenome, com até 100 caracteres em cada parte.';
     if (!birthDateToISO(draft.birthDate)) errors.birthDate = 'Informe uma data válida, sem datas futuras.';
     if (!genders.includes(draft.gender)) errors.gender = 'Selecione uma opção de gênero.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Informe um e-mail válido.';
+    if (draft.email.trim().length > 150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Informe um e-mail válido de até 150 caracteres.';
   }
   if (step === 1) {
     if (!Number.isFinite(decimalValue(draft.height)) || !(decimalValue(draft.height) > 0)) errors.height = 'Informe uma altura maior que zero, em cm.';
     if (!Number.isFinite(decimalValue(draft.weight)) || !(decimalValue(draft.weight) > 0)) errors.weight = 'Informe um peso maior que zero, em kg.';
+    for (const key of ['height', 'weight'] as const) {
+      const value = decimalValue(draft[key]);
+      if (value > 999.99 || Math.abs(value * 100 - Math.round(value * 100)) > 0.00001) errors[key] = 'Use até duas casas decimais e no máximo 999,99.';
+    }
+    if (draft.medicalNotes.trim().length > 1000) errors.medicalNotes = 'Use até 1000 caracteres.';
     if (draft.activityLevel && !activityLevels.includes(draft.activityLevel)) errors.activityLevel = 'Selecione uma opção válida.';
   }
   if (step === 2) {
     if (!draft.categories.length || draft.categories.some(category => !exerciseCategories.includes(category))) errors.categories = 'Escolha ao menos uma modalidade.';
     if (!draft.goal.trim()) errors.goal = 'Conte qual é seu objetivo com os treinos.';
+    if (draft.goal.trim().length > 1000) errors.goal = 'Use até 1000 caracteres.';
   }
   if (step === 3) {
     const hours = draft.hours === '' ? 0 : /^\d+$/.test(draft.hours) ? Number(draft.hours) : NaN;
@@ -121,6 +128,17 @@ export function toProfilePayload(draft: RegistrationDraft) {
   };
 }
 export type RegistrationProfile = ReturnType<typeof toProfilePayload>;
+
+export function toProfilePatch(draft: RegistrationDraft, step: number): Partial<RegistrationProfile> {
+  if (Object.keys(validateRegistrationStep(draft, step)).length) throw new Error('Revise os campos indicados.');
+  switch (step) {
+    case 0: return { fullName: draft.fullName.trim().replace(/\s+/g, ' '), birthDate: birthDateToISO(draft.birthDate)!, gender: draft.gender, email: draft.email.trim() };
+    case 1: return { heightCm: decimalValue(draft.height), weightKg: decimalValue(draft.weight), activityLevel: draft.activityLevel || null, medicalNotes: draft.medicalNotes.trim() || null };
+    case 2: return { exerciseCategories: [...new Set(draft.categories)], goal: draft.goal.trim() };
+    case 3: return { availableMinutesPerDay: Number(draft.hours) * 60 + Number(draft.minutes), availableDays: [...new Set(draft.days)].sort((a, b) => a - b) };
+    default: throw new Error('Etapa de perfil inválida.');
+  }
+}
 
 export function toRegistrationPayload(draft: RegistrationDraft) {
   if (Object.keys(validateRegistrationStep(draft, 4)).length) throw new Error('Cadastro inválido. Revise os campos.');

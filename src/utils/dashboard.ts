@@ -12,6 +12,10 @@ export type Exercise = {
   order?: number;
 };
 export type DailyWorkout = { id: string; title: string; date: string; exercises: Exercise[] };
+export type ServerSession = Omit<WorkoutSession, 'status' | 'exercises'> & {
+  dailyWorkoutId: number; status: 'active' | 'completed' | 'ended';
+  exercises: (WorkoutSession['exercises'][number] & { exerciseOrder: number })[];
+};
 export type WorkoutSession = {
   id: string;
   date: string;
@@ -31,6 +35,20 @@ export type DashboardData = {
 
 export function formatDate(date: string) {
   return date.split('-').reverse().join('/');
+}
+
+// Preserva os registros salvos por versões anteriores ao refino dos textos.
+export function workoutLabel(title: string) {
+  return title === 'Treino local' ? 'Treino do dia' : title;
+}
+
+export function exerciseLabel(name: string) {
+  return name.replace(/\s*· exemplo$/i, '');
+}
+
+export function exerciseDescription(exercise: Exercise) {
+  return /ilustrativ|exemplo|provisóri/i.test(exercise.description)
+    ? `${exercise.category} · ${exercise.muscles.join(', ')}` : exercise.description;
 }
 
 export function formatDuration(seconds: number) {

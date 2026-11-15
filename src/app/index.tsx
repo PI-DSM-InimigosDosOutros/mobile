@@ -106,10 +106,10 @@ export default function LoginScreen() {
         if (sending.current) return;
         sending.current = true; setLoading(true);
         try { await dashboard.enterDemo(); router.push('/(preview)/treino'); }
-        catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível abrir o modo local.'); }
+        catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível continuar. Tente novamente.'); }
         finally { sending.current = false; setLoading(false); }
       }}>
-        <ThemedText type="technical" style={[styles.underline, { color: theme.textSecondary }]}>DESENVOLVIMENTO: ABRIR MODO LOCAL →</ThemedText>
+        <ThemedText type="technical" style={[styles.underline, { color: theme.textSecondary }]}>CONTINUAR PARA MEUS TREINOS →</ThemedText>
       </Pressable>}
     </Screen>
   );

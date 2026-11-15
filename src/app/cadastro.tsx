@@ -7,10 +7,12 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { initialRegistration, toProfilePayload, validateRegistrationStep, type RegistrationErrors } from '@/utils/registration';
+import { initialRegistration, toProfilePayload, toRegistrationPayload, validateRegistrationStep, type RegistrationErrors } from '@/utils/registration';
 import { useRef, useState } from 'react';
 import { useRegistration } from '@/hooks/use-registration';
 import { useDashboard } from '@/hooks/use-dashboard';
+import { registerAccount, useMockRegistration } from '@/services/api';
+import { useSession } from '@/hooks/use-session';
 
 const steps = [PersonalStep, PhysicalStep, PreferencesStep, AvailabilityStep, SecurityStep];
 
@@ -22,6 +24,7 @@ export default function RegisterScreen() {
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
   const dashboard = useDashboard();
+  const { signIn } = useSession();
   const { etapa } = useLocalSearchParams<{ etapa?: string }>();
   const number = Number(etapa);
   const step = Number.isInteger(number) && number >= 1 && number <= 5 ? number - 1 : 0;
@@ -46,10 +49,15 @@ export default function RegisterScreen() {
       if (invalidStep !== undefined) { navigateToStep(invalidStep); return; }
       busy.current = true; setPending(true);
       try {
-        await dashboard.registerLocal(toProfilePayload(current));
+        if (useMockRegistration) await dashboard.registerLocal(toProfilePayload(current));
+        else {
+          const session = await registerAccount(toRegistrationPayload(current));
+          await dashboard.leaveDemo();
+          await signIn(session);
+        }
         setDraft(initialRegistration);
         router.replace('/(preview)/treino');
-      } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o perfil local.'); }
+      } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível concluir seu cadastro. Tente novamente.'); }
       finally { busy.current = false; setPending(false); }
     }
   }
@@ -75,13 +83,12 @@ export default function RegisterScreen() {
         </View>
       </View>
       <ThemedText type="technical" accent>SEU CADASTRO · ETAPA {step + 1} DE 5</ThemedText>
-      <ThemedText type="technical">CADASTRO LOCAL DE TESTE · Salvo neste dispositivo. Não cria conta no servidor e não armazena sua senha.</ThemedText>
       {Boolean(storageError) && <ThemedText accessibilityRole="alert">{storageError}</ThemedText>}
       <CurrentStep draft={{ ...draft, accentColor: theme.accent }} errors={errors} onChange={patch => { setDraft(current => ({ ...current, ...patch })); setMessage(''); }} />
       {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
       <View style={styles.actions}>
         <View style={styles.grow}>
-          <ActionButton title={step === 4 ? 'Criar perfil local' : 'Avançar'} loading={pending} onPress={advance} />
+          <ActionButton title={step === 4 ? 'Concluir cadastro' : 'Avançar'} loading={pending} onPress={advance} />
         </View>
         <ThemedText type="technical" accent>{String(step + 1).padStart(2, '0')} / 05</ThemedText>
       </View>

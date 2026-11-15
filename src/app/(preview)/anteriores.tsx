@@ -7,31 +7,30 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDuration, historySummary, type DashboardData } from '@/utils/dashboard';
+import { formatDate, formatDuration, workoutLabel, historySummary, type DashboardData } from '@/utils/dashboard';
 import { openPreview } from '@/utils/preview-navigation';
 import { filterSessionHistory } from '@/utils/dashboard';
 
 export default function HistoryScreen() {
   const { data } = useDashboard();
   return <DashboardScreen>{data ? <HistoryContent data={data} /> :
-    <DashboardEmpty title="Cada treino conta" description="Suas sessões e seus resultados ficarão aqui. Ainda não há histórico conectado à sua conta." />}
+    <DashboardEmpty title="Cada treino conta" description="Seus treinos e resultados em um só lugar. Comece sua primeira sessão." />}
   </DashboardScreen>;
 }
 
 function HistoryContent({ data }: { data: DashboardData }) {
   const theme = useTheme();
-  const { filters, setFilters, isDemo } = useDashboard();
+  const { filters, setFilters } = useDashboard();
   const summary = historySummary(data.history);
   const filtered = filterSessionHistory(data.history, filters);
   const sessions = filtered.slice(0, 3);
   const mostRecent = data.history[0];
   return <View style={styles.section}>
     <SectionHeading title="Treinos anteriores" />
-    {!isDemo && <ThemedText type="technical">Resumos desta abertura do aplicativo. A consulta do histórico completo da conta aguarda o serviço de histórico.</ThemedText>}
     <View style={styles.overview}>
       <View style={[styles.receipt, { backgroundColor: theme.field }]}>
         <View style={styles.receiptTitle}><ThemedText type="label" style={{ color: theme.onField }}>Resumo:</ThemedText><Artwork name="history" width={22} color={theme.onField} /></View>
-        <ThemedText type="technical" style={[styles.receiptCaption, { color: theme.onField }]}>{isDemo ? 'SESSÕES DO MOCK LOCAL' : 'RESUMOS DESTA ABERTURA'}</ThemedText>
+        <ThemedText type="technical" style={[styles.receiptCaption, { color: theme.onField }]}>SEU MOVIMENTO EM NÚMEROS</ThemedText>
         <View style={[styles.receiptLine, { borderColor: theme.onField }]} />
         <ThemedText style={[styles.receiptText, { color: theme.onField }]}>{data.history.length} sessões registradas{'\n'}{summary.completed} concluídas{'\n'}{summary.ended} encerrada(s) antes do fim</ThemedText>
         <ThemedText type="technical" style={{ color: theme.onField }}>Último registro:{'\n'}{mostRecent ? formatDate(mostRecent.date) : '—'}</ThemedText>
@@ -62,7 +61,7 @@ function HistoryContent({ data }: { data: DashboardData }) {
       onPress={() => openPreview('sessao', session.id)}
       style={[styles.session, { backgroundColor: theme.surface, borderColor: theme.accent }]}>
       <View style={styles.sessionTop}><ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText><ThemedText type="technical">{formatDuration(session.durationSeconds)}</ThemedText></View>
-      <ThemedText type="label">{session.title}</ThemedText>
+      <ThemedText type="label">{workoutLabel(session.title)}</ThemedText>
       <ThemedText type="technical">{session.status === 'completed' ? '✓ CONCLUÍDO' : '/ ENCERRADO MANUALMENTE'}</ThemedText>
     </Pressable>)}
     {!sessions.length && <ThemedText>Nenhum treino registrado.</ThemedText>}

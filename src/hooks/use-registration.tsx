@@ -16,7 +16,7 @@ export function RegistrationProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     readLocalDraft().then(value => { if (active) setDraft(value); })
-      .catch(() => { if (active) setStorageError('Não foi possível recuperar o rascunho local.'); })
+      .catch(() => { if (active) setStorageError('Não foi possível recuperar seu cadastro.'); })
       .finally(() => { if (active) setReady(true); });
     return () => { active = false; };
   }, []);
@@ -24,7 +24,7 @@ export function RegistrationProvider({ children }: PropsWithChildren) {
     if (!ready) return;
     const timeout = setTimeout(() => {
       saveLocalDraft(draft).then(() => setStorageError(''))
-        .catch(() => setStorageError('Não foi possível salvar o rascunho neste dispositivo.'));
+        .catch(() => setStorageError('Não foi possível salvar seu cadastro. Tente novamente.'));
     }, 300);
     return () => clearTimeout(timeout);
   }, [draft, ready]);

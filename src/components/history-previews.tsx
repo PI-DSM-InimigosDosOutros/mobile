@@ -5,7 +5,7 @@ import { FormField } from '@/components/form-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDuration, filterSessionHistory, type HistoryFilters, type DashboardData } from '@/utils/dashboard';
+import { formatDate, formatDuration, workoutLabel, exerciseLabel, filterSessionHistory, type HistoryFilters, type DashboardData } from '@/utils/dashboard';
 import { openPreview, closePreview } from '@/utils/preview-navigation';
 import { useState } from 'react';
 import { useDashboard } from '@/hooks/use-dashboard';
@@ -40,24 +40,23 @@ export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewNam
       {filtered.map(session => <Pressable key={session.id} accessibilityRole="button" accessibilityLabel={`Ver sessão de ${formatDate(session.date)}`}
         onPress={() => openPreview('sessao', session.id)} style={[styles.row, { borderColor: theme.border }]}>
         <ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText>
-        <ThemedText type="label">{session.title}</ThemedText>
+        <ThemedText type="label">{workoutLabel(session.title)}</ThemedText>
         <ThemedText type="technical">{session.status === 'completed' ? '✓ CONCLUÍDO' : '/ ENCERRADO MANUALMENTE'} · {formatDuration(session.durationSeconds)}</ThemedText>
       </Pressable>)}
       {!filtered.length && <ThemedText>Nenhuma sessão corresponde aos filtros.</ThemedText>}
     </>;
     case 'sessao': {
       const session = id ? data.history.find(item => item.id === id) : data.history[0];
-      if (!session) return <ThemedText>Sessão não encontrada nesta prévia.</ThemedText>;
+      if (!session) return <ThemedText>Treino não encontrado. Volte ao histórico para escolher outra sessão.</ThemedText>;
       const completed = session.exercises.filter(exercise => exercise.completed);
       const average = completed.length ? completed.reduce((sum, exercise) => sum + exercise.durationSeconds, 0) / completed.length : 0;
       return <>
-        {session.id.startsWith('local-') && <ThemedText type="technical">{dashboard.isDemo ? 'Resumo salvo neste dispositivo no modo local. Não foi enviado ao servidor.' : 'Tempos medidos nesta prática; tempos de conclusões anteriores não são recuperados. O resumo fica nesta abertura do app. Histórico definitivo e sequência dependem do serviço da conta.'}</ThemedText>}
         <ThemedText type="technical" accent>{formatDate(session.date)}</ThemedText>
-        <ThemedText type="title">{session.title}</ThemedText>
+        <ThemedText type="title">{workoutLabel(session.title)}</ThemedText>
         <ThemedText>{session.status === 'completed' ? 'Treino concluído integralmente.' : 'Treino encerrado manualmente. Não incrementa a sequência.'}</ThemedText>
         <ThemedText type="label">{completed.length} de {session.exercises.length} exercícios concluídos</ThemedText>
-        {session.exercises.map((exercise, index) => <View key={`${exercise.name}-${index}`} style={[styles.detail, { borderColor: theme.border }]}>
-          <View style={styles.grow}><ThemedText>{exercise.name}</ThemedText>
+        {session.exercises.map((exercise, index) => <View key={`${exerciseLabel(exercise.name)}-${index}`} style={[styles.detail, { borderColor: theme.border }]}>
+          <View style={styles.grow}><ThemedText>{exerciseLabel(exercise.name)}</ThemedText>
             <ThemedText type="technical" accent>{exercise.completed ? '✓ CONCLUÍDO' : exercise.durationSeconds ? '/ INTERROMPIDO' : 'NÃO REALIZADO'}</ThemedText>
           </View>
           <ThemedText type="technical">{formatDuration(exercise.durationSeconds)}</ThemedText>
@@ -77,8 +76,7 @@ export function HistoryPreview({ screen, data, id }: { screen: HistoryPreviewNam
     case 'sequencia': {
       const status = { completed: '✓ Concluído', ended: '/ Encerrado manualmente', scheduled: '○ Programado', rest: '· Sem treino programado' };
       return <>
-        <ThemedText type="title" accent>{dashboard.isDemo ? `${data.currentStreak} dias em sequência` : 'Cada treino conta'}</ThemedText>
-        {!dashboard.isDemo && <ThemedText>A sequência da conta estará disponível quando o histórico e os dias programados forem fornecidos pelo servidor.</ThemedText>}
+        <ThemedText type="title" accent>{data.currentStreak} dias em sequência</ThemedText>
         {data.week.map(day => <View key={day.date} style={[styles.detail, { borderColor: theme.border }]}>
           <ThemedText type="technical">{formatDate(day.date)}</ThemedText><View style={styles.grow}><ThemedText style={styles.right}>{status[day.status]}</ThemedText></View>
         </View>)}

@@ -1,49 +1,33 @@
-# Modo local e pontos de troca pela API
+# Mock e integração — mapa atual
 
-O mock usa AsyncStorage, já instalado no projeto. Na web, isso usa o localStorage; em Android/iOS, usa o armazenamento do aplicativo. Os dados ficam apenas neste dispositivo/origem. Não há sincronização com o servidor.
+Os textos técnicos foram retirados da interface para apresentação. O funcionamento continua separado entre perfil mock e conta autenticada; não há migração automática dos dados de apresentação para o servidor.
 
-## Como testar
+## Operações já conectadas
 
-- Cadastro: preencher as cinco etapas e clicar em **Criar perfil local**. Cria um único perfil de teste no dispositivo, sem criar usuário no backend nem armazenar senha.
-- Entrada: **DESENVOLVIMENTO: ABRIR MODO LOCAL** abre o perfil salvo; no primeiro acesso sem cadastro, cria a demonstração com exemplos identificados.
-- Criar treino: abre as preferências do perfil e permite **Criar treino local**. O catálogo é ilustrativo, limitado às modalidades selecionadas e ao tempo disponível. Não é geração por IA ou prescrição personalizada. Metas, medidas e observações são armazenadas, mas não interpretadas pelo mock.
-- Execução: iniciar, pausar, retomar, concluir exercícios ou encerrar antes do fim. A prática é salva periodicamente e nas mudanças de estado. Reabrir recupera a prática pausada, sem contar o tempo fechado; pode perder até aproximadamente dois segundos entre checkpoints.
-- Conta: editar dados pessoais, medidas, metas, modalidades e disponibilidade e clicar em **Salvar no dispositivo**. Mudanças afetam a próxima geração, preservando o treino atual e o histórico.
-- Histórico: resumos completos/parciais e tempos ficam salvos. A sequência local é calculada pelos registros e dias programados, sem incrementar por encerramento parcial. Os filtros atuam sobre os registros locais.
-- Sair: fecha o modo local, preservando seus dados. A entrada de desenvolvimento permite continuar depois. Um novo cadastro não sobrescreve um perfil já salvo: use a edição da Conta.
+- Cadastro completo: `app/cadastro.tsx` → `registerAccount()` em `services/api.ts`. Ativar EXPO_PUBLIC_DATA_MODE=api. Campos são normalizados em `utils/registration.ts`; senha não entra em rascunhos persistidos.
+- Perfil: `components/account-previews.tsx` → `toProfilePatch()` → `dashboard.updateDemoProfile()`. O nome do método foi preservado, mas contas reais usam PUT /user/profile e apresentação usa armazenamento local. Cada grupo é salvo separadamente, preservando o restante do perfil.
+- Treino: `dashboard.createWorkout()` chama /workout/create na conta ou `generateMockWorkout()` na apresentação.
+- Prática: `hooks/use-workout-practice.ts` usa dailyWorkoutId no início, sessionId + exerciseOrder + durationSeconds na conclusão e sessionId + exercício interrompido na finalização.
+- Histórico e métricas: `fetchHistory()` e `fetchMetrics()` preenchem `data.history`, `currentStreak` e `week` na conta real. A finalização real exibe o resumo do servidor.
+- Senha: o modal Segurança envia currentPassword/newPassword para /user/change-password; recuperação e redefinição mantêm suas rotas próprias.
+- Contratos: `services/userAdapter.ts`, `workoutAdapter.ts` e `historyAdapter.ts` correspondem às respostas atuais do backend. `services/registration.ts` reexporta o serviço real; o contrato antigo isolado foi retirado.
 
-O perfil inicial e as sessões `demo-*` são exemplos. Perfis criados pelo cadastro começam sem histórico e sem treino. Os dados `mock-*` são produzidos para teste e os resumos `local-*` registram somente a prática no aparelho. A interface identifica o modo local em telas e modais.
+Os caminhos acima ficam dentro de `src/` do mobile. O backend tem controllers em `https/`, serviços em `services/` e persistência em `repositories/`.
 
-## O que já usa a API
+## O que continua mock
 
-`src/services/api.ts` concentra login, recuperação, redefinição de senha, consulta do treino, início, avanço e finalização, conforme os contratos do backend atual. Esses fluxos permanecem separados do mock. Uma falha da API não ativa o mock automaticamente. A validação com MySQL e envio real de e-mail continua pendente da configuração da equipe.
+Somente o modo de apresentação continua usando `data/demo-dashboard.ts`, `utils/mock-dashboard.ts` e `services/mock-storage.ts`: perfil, preferências, catálogo/geração ilustrativa, prática, histórico e sequência. As imagens/GIFs ausentes nesse catálogo permanecem sem arquivo demonstrativo. As modalidades foram alinhadas ao SQL; descrições e nomes antigos são formatados para apresentação sem apagar os registros.
 
-`POST /api/user/register` existe no backend, mas não recebe o cadastro completo de cinco etapas. O serviço anterior `src/services/registration.ts` contém uma proposta de contrato e não é chamado pelas telas. A rota técnica de emissão de token também não é usada como alternativa ao login.
+Não há autenticação por senha no modo mock. Recuperação por e-mail e alteração de senha não recebem sucesso fictício. A cor continua sendo uma preferência do dispositivo em ambos os modos.
 
-## Lista para substituir depois
+`RegistrationDraft` não é uma pendência de API: é o formato dos campos de preenchimento. `RegistrationProfile` representa os dados normalizados; `Practice` representa a execução e `WorkoutSession` o resumo.
 
-| Contexto/campos | Objeto usado pela interface | Local principal | Integração futura |
-| --- | --- | --- | --- |
-| Cadastro em cinco etapas | `RegistrationDraft` → `RegistrationProfile` | `src/app/cadastro.tsx`, `src/hooks/use-registration.tsx`, `src/utils/registration.ts` | Substituir `dashboard.registerLocal(profile)` por criação completa da conta; alinhar nome, gênero e resposta de autenticação. |
-| Nome, nascimento, gênero e e-mail | `data.profile` | `src/components/account-previews.tsx` → `dashboard.updateDemoProfile(profile)` | Consultar/atualizar perfil pela API. |
-| Altura, peso, atividade e observações | `data.profile.heightCm`, `weightKg`, `activityLevel`, `medicalNotes` | Mesmo fluxo de edição do perfil | Persistir e retornar esses campos no backend. |
-| Meta e modalidades | `data.profile.goal`, `exerciseCategories` | Mesmo fluxo de edição do perfil | Alinhar opções/IDs do catálogo e salvar preferências. |
-| Minutos/dia e dias da semana | `data.profile.availableMinutesPerDay`, `availableDays` | Mesmo fluxo de edição do perfil | Salvar disponibilidade e usá-la na geração/agendamento. |
-| Criar treino | `data.workout: DailyWorkout` | `src/utils/mock-dashboard.ts` → `generateMockWorkout`, chamado por `dashboard.createWorkout()` | Trocar catálogo simulado pela operação de geração e adaptar a resposta. |
-| Prática em andamento | `Practice`: índice, durações, conclusões e relógio | `src/hooks/use-workout-practice.ts` | Alinhar sessão identificável e retomada no servidor; início/progresso/finalização já têm chamadas reais fora do mock. |
-| Resumo e histórico | `data.history: WorkoutSession[]` | `dashboard.keepSummary()`, `recordMockSummary()`, `src/components/history-previews.tsx` | Gravar/consultar sessões, situação integral/parcial e tempos reais. Evitar duplicidade em repetição de pedidos. |
-| Sequência e semana | `data.currentStreak`, `data.week` | `src/utils/mock-dashboard.ts` → `mockProgress()` | Usar histórico e agendamento definitivos da conta; manter regras documentadas. |
-| Cor | `theme.accent`, `profile.accentColor` | `src/hooks/use-theme.tsx`, `src/components/accent-palette.tsx` | Opcionalmente sincronizar com o perfil; a escolha já é salva por dispositivo. |
+## O que falta executar fora do código
 
-## Organização e limites
+- Conferir o esquema publicado e aplicar `src/migrations/001_workout_sessions.sql` do backend, que adiciona sessões, exercícios por sessão e versões de disponibilidade. O script original de criação do banco ficou fora das alterações, conforme solicitado.
+- Configurar MySQL, JWT_SECRET, APP_TIMEZONE, SMTP, MAIL_FROM, FRONTEND_URL, GEMINI_API_KEY e GEMINI_MODEL. Trocar JWT_SECRET na publicação para invalidar os tokens da antiga emissão sem senha.
+- Confirmar os códigos de gênero das contas legadas: o contrato usa F/M/N/P para as quatro opções existentes.
+- Testar transações, concorrência, GIFs, e-mail, link de retorno e geração no ambiente real e em dispositivos físicos.
+- Histórico anterior sem tempos/situação não pode ser reconstruído automaticamente. A retomada da API recupera o progresso confirmado, sem o tempo ainda não enviado do exercício que estava aberto.
 
-- `src/services/mock-storage.ts`: único ponto de leitura/gravação dos snapshots e rascunhos do mock. Snapshot versionado em `@workin/mock/v1`; rascunho em `@workin/mock-draft/v1`, sem senha nem confirmação.
-- `src/hooks/use-dashboard.tsx`: operações que as telas chamam. Conectar os endpoints futuros nesses métodos permite preservar os formulários e layouts. O modo de conta real continua usando os serviços existentes.
-- `src/utils/mock-dashboard.ts`: catálogo ilustrativo, montagem local, resumo e cálculo de sequência. Essa simulação não deve ser movida para produção como algoritmo de treino.
-- `RegistrationDraft` é o formato de preenchimento (textos, data DD/MM/AAAA, horas/minutos). `RegistrationProfile` é o objeto normalizado para uso/salvamento. O rascunho continua necessário mesmo após a API estar pronta; não é um placeholder.
-- Autenticação, recuperação por e-mail e alteração autenticada de senha não são substituídas por armazenamento local. A troca de senha pela conta permanece pendente de endpoint. O mock não guarda credenciais nem oferece autenticação real.
-- GIFs continuam indisponíveis quando não fornecidos. Não foram criados arquivos ou URLs fictícios para aparentar integração.
-- A cor é uma preferência do dispositivo. Alterar a cor não representa sincronização com o backend.
-- O histórico da conta real ainda fica em memória; os dados persistentes desta implementação pertencem ao modo local e não são enviados automaticamente ao usuário autenticado.
-
-Não basta remover a palavra “mock”: cada ponto acima exige alinhamento de contrato, validação no servidor, substituição da operação local e teste com o banco real.
+Os limites da IA são por processo e não substituem a cota de gastos do provedor. Nenhum desses serviços externos foi acionado usando credenciais reais nesta implementação.

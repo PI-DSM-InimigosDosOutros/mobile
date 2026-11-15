@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDuration, type DailyWorkout } from '@/utils/dashboard';
+import { formatDate, formatDuration, workoutLabel, exerciseLabel, exerciseDescription, type DailyWorkout } from '@/utils/dashboard';
 import { openPreview } from '@/utils/preview-navigation';
 
 export default function TodayScreen() {
@@ -20,22 +20,21 @@ export default function TodayScreen() {
     {Boolean(error) && <ThemedText accessibilityRole="alert">{error}</ThemedText>}
     {Boolean(error) && <ActionButton title="Tentar novamente" outlined loading={loading} onPress={() => void refresh()} />}
     {data && data.workout.exercises.length > 0 ? <WorkoutOverview workout={data.workout} availableMinutes={data.profile.availableMinutesPerDay} exerciseId={exercicio} /> :
-      data ? <ThemedText>Seu treino aparecerá aqui quando estiver disponível na sua conta.</ThemedText> :
-      <DashboardEmpty title="Primeiro vamos ajustar seu treino pra você!" description="Seu treino do dia aparecerá aqui quando sua conta e suas preferências estiverem conectadas." />}
+      data ? <ThemedText>Seu próximo movimento começa aqui. Toque em Criar treino para preparar sua sequência.</ThemedText> :
+      <DashboardEmpty title="Primeiro vamos ajustar seu treino pra você!" description="Preencha seu perfil e escolha como quer começar." />}
   </DashboardScreen>;
 }
 
 function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: DailyWorkout; availableMinutes: number; exerciseId?: string }) {
   const theme = useTheme();
-  const { isDemo } = useDashboard();
   const index = Math.max(0, workout.exercises.findIndex(item => item.id === exerciseId));
   const exercise = workout.exercises[index];
   const duration = workout.exercises.reduce((sum, item) => sum + item.estimatedSeconds, 0);
   const categories = [...new Set(workout.exercises.map(item => item.category))];
   const muscles = [...new Set(workout.exercises.flatMap(item => item.muscles))];
   return <View style={styles.section}>
-    <SectionHeading title={workout.title} />
-    <ThemedText type="technical">{isDemo ? 'TREINO ILUSTRATIVO' : 'TREINO DO DIA'} · {formatDate(workout.date)}</ThemedText>
+    <SectionHeading title={workoutLabel(workout.title)} />
+    <ThemedText type="technical">TREINO DO DIA · {formatDate(workout.date)}</ThemedText>
     <View style={styles.tags}>{categories.map(category => <View key={category} style={[styles.tag, { backgroundColor: theme.accent }]}>
       <ThemedText type="technical" style={{ color: theme.onAccent }}>{category.toUpperCase()}</ThemedText>
     </View>)}</View>
@@ -62,15 +61,15 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
     </View>
     <View style={[styles.exercise, { backgroundColor: theme.field }]}>
       <View style={styles.exerciseText}>
-        <ThemedText type="label" accessibilityRole="header" style={{ color: theme.onField }}>{exercise.name}</ThemedText>
-        <ThemedText style={[styles.description, { color: theme.onField }]}>{exercise.description}</ThemedText>
+        <ThemedText type="label" accessibilityRole="header" style={{ color: theme.onField }}>{exerciseLabel(exercise.name)}</ThemedText>
+        <ThemedText style={[styles.description, { color: theme.onField }]}>{exerciseDescription(exercise)}</ThemedText>
         <ThemedText type="technical" style={{ color: theme.onField }}>{workout.exercises.length - index - 1} exercício(s) após este.</ThemedText>
       </View>
       <View style={[styles.exerciseVisual, { borderColor: theme.border }]}>
-        {exercise.gifUrl ? <Image source={{ uri: exercise.gifUrl }} style={styles.gifPreview} contentFit="contain" accessibilityLabel={`Demonstração de ${exercise.name}`} /> :
+        {exercise.gifUrl ? <Image source={{ uri: exercise.gifUrl }} style={styles.gifPreview} contentFit="contain" accessibilityLabel={`Demonstração de ${exerciseLabel(exercise.name)}`} /> :
           <Artwork name="person" width={44} height={50} color={theme.onField} />}
         <ThemedText style={[styles.exerciseTime, { color: theme.onField }]}>{formatDuration(exercise.estimatedSeconds)}</ThemedText>
-        <ThemedText type="technical" style={[styles.pending, { color: theme.onField }]}>{exercise.gifUrl ? 'DEMONSTRAÇÃO VISUAL' : 'GIF PENDENTE'}</ThemedText>
+        <ThemedText type="technical" style={[styles.pending, { color: theme.onField }]}>{exercise.gifUrl ? 'DEMONSTRAÇÃO VISUAL' : 'TEMPO ESTIMADO'}</ThemedText>
       </View>
     </View>
     <ActionButton title="Visualizar exercício" outlined onPress={() => openPreview('exercicio', exercise.id)} />
@@ -78,7 +77,7 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
       <ActionButton title="Revisar treino" icon="dumbbell" onPress={() => openPreview('treino')} />
     </View></View>
     <ActionButton title="Visualizar execução" onPress={() => openPreview('execucao', exercise.id)} />
-    <ThemedText type="technical">Abra a execução para iniciar e acompanhar os exercícios. Na demonstração, os dados são apenas ilustrativos.</ThemedText>
+    <ThemedText type="technical">Prepare seu espaço e comece quando estiver pronto. Você pode pausar a qualquer momento.</ThemedText>
   </View>;
 }
 const styles = StyleSheet.create({

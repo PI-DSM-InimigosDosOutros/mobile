@@ -13,12 +13,11 @@ import { formatDate } from '@/utils/dashboard';
 import { openPreview } from '@/utils/preview-navigation';
 
 export function DashboardScreen({ children }: PropsWithChildren) {
-  const { data, isDemo, storageError, refresh } = useDashboard();
+  const { data, storageError, refresh } = useDashboard();
   const theme = useTheme();
   return (
     <Screen code="user:home" dashboard>
       <ThemedText type="technical">seja bem-vindo(a), <ThemedText type="technical" accent>{data ? data.profile.fullName.split(' ')[0] : 'seu próximo movimento começa aqui'}...</ThemedText></ThemedText>
-      <ThemedText type="technical" accent>{isDemo ? 'MODO LOCAL · MOCK · SALVO NESTE DISPOSITIVO' : 'SUA CONTA · WORKIN'}</ThemedText>
       {Boolean(storageError) && <><ThemedText accessibilityRole="alert">{storageError}</ThemedText><ActionButton title="Tentar salvar novamente" outlined onPress={() => void refresh()} /></>}
       <StreakPanel />
       <View style={styles.tabs} accessibilityRole="tablist">
@@ -49,17 +48,17 @@ function MenuTab({ children, isFocused, ...props }: TabTriggerSlotProps) {
 }
 
 function StreakPanel() {
-  const { data, isDemo } = useDashboard();
+  const { data } = useDashboard();
   const theme = useTheme();
   const labels = { completed: 'concluído', ended: 'encerrado manualmente', scheduled: 'programado', rest: 'sem treino programado' };
   return (
     <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes da sequência" onPress={() => openPreview('sequencia')}
       style={[styles.streak, { backgroundColor: theme.field }]}>
       <View style={styles.streakHeading}>
-        <ThemedText style={[styles.streakNumber, { color: theme.onField }]}>{isDemo ? data?.currentStreak : '—'}</ThemedText>
+        <ThemedText style={[styles.streakNumber, { color: theme.onField }]}>{data?.currentStreak ?? '—'}</ThemedText>
         <View style={styles.grow}>
           <ThemedText type="label" style={{ color: theme.onField }}>Dias{ '\n' }em sequência</ThemedText>
-          <ThemedText type="technical" style={[styles.streakCaption, { color: theme.onField }]}>{isDemo ? 'DIAS PROGRAMADOS CONCLUÍDOS' : 'SEQUÊNCIA AGUARDA HISTÓRICO DA CONTA'}</ThemedText>
+          <ThemedText type="technical" style={[styles.streakCaption, { color: theme.onField }]}>DIAS PROGRAMADOS CONCLUÍDOS</ThemedText>
         </View>
       </View>
       <View style={styles.week}>

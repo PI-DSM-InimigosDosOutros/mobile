@@ -49,12 +49,12 @@ export function PhysicalStep({ draft, errors = {}, onChange }: RegistrationStepP
         <View style={styles.grow}><FormField label="Peso (kg)" placeholder="EX.: 70,5" tone="accent" keyboardType="decimal-pad"
           editable={Boolean(onChange)} onChangeText={value => onChange?.({ weight: value })} value={draft.weight} error={errors.weight} /></View>
       </View>
-      <ThemedText type="technical">Informe a altura em centímetros e o peso em quilos. A demonstração visual de medidas ainda não está disponível.</ThemedText>
+      <ThemedText type="technical">Informe a altura em centímetros e o peso em quilos.</ThemedText>
       <ChoiceGroup label="Sua relação com atividades físicas (opcional)" options={activityLevels}
         onSelect={onChange ? value => onChange({ activityLevel: value }) : undefined} selected={draft.activityLevel ? [draft.activityLevel] : []}
         error={errors.activityLevel} />
       <FormField label="Observações médicas (opcional)" required={false} placeholder="O QUE VOCÊ GOSTARIA DE INFORMAR?" multiline
-        editable={Boolean(onChange)} onChangeText={value => onChange?.({ medicalNotes: value })} value={draft.medicalNotes} />
+        editable={Boolean(onChange)} onChangeText={value => onChange?.({ medicalNotes: value })} value={draft.medicalNotes} error={errors.medicalNotes} />
     </View>
   );
 }

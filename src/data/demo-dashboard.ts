@@ -29,7 +29,7 @@ export function createDemoDashboard(today = new Date()): DashboardData {
     profile: {
       fullName: 'Alex Lima', birthDate: '2000-03-15', gender: 'Prefiro não informar', email: 'alex@example.com',
       heightCm: 170, weightKg: 70, activityLevel: 'Pratico ocasionalmente', medicalNotes: null,
-      exerciseCategories: ['Calistenia', 'Yoga'], goal: 'Criar uma rotina de atividade física em casa.',
+      exerciseCategories: ['Calistenia', 'Flexibilidade'], goal: 'Criar uma rotina de atividade física em casa.',
       availableMinutesPerDay: 20, availableDays, accentColor: '#BAE068',
     },
     workout: { id: 'demo-today', title: 'Corpo inteiro', date: dateKey(today), exercises },

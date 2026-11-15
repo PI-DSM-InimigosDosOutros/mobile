@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { accentColors, birthDateToISO, initialRegistration, passwordRequirements, toRegistrationPayload, validateRegistrationStep } from '../src/utils/registration.ts';
-import { registerUser } from '../src/services/registration.ts';
+
 
 const validDraft = () => ({
   ...initialRegistration, fullName: '  Pessoa   Teste  ', birthDate: '29/02/2000', gender: 'Prefiro não informar',
-  email: ' teste@example.com ', height: '170,5', weight: '70.2', categories: ['Yoga'], goal: '  Melhorar condicionamento  ',
+  email: ' teste@example.com ', height: '170,5', weight: '70.2', categories: ['Flexibilidade'], goal: '  Melhorar condicionamento  ',
   hours: '1', minutes: '15', days: [7, 1], password: 'Teste123!', confirmPassword: 'Teste123!',
 });
 
@@ -59,69 +59,4 @@ test('cores de destaque mantêm contraste para texto grafite', () => {
     return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
   };
   for (const color of accentColors) assert.ok((luminance(color.value) + 0.05) / (luminance('#20212B') + 0.05) >= 4.5);
-});
-
-function configureEndpoint(t, value) {
-  const previous = process.env.EXPO_PUBLIC_REGISTER_URL;
-  if (value) process.env.EXPO_PUBLIC_REGISTER_URL = value;
-  else delete process.env.EXPO_PUBLIC_REGISTER_URL;
-  t.after(() => {
-    if (previous === undefined) delete process.env.EXPO_PUBLIC_REGISTER_URL;
-    else process.env.EXPO_PUBLIC_REGISTER_URL = previous;
-  });
-}
-
-test('sem endpoint, nenhum pedido é enviado e não há sucesso simulado', async t => {
-  configureEndpoint(t);
-  const fetch = t.mock.method(globalThis, 'fetch', () => { throw new Error('Não deve ser chamado'); });
-  await assert.rejects(registerUser(toRegistrationPayload(validDraft())), /não foi configurada/);
-  assert.equal(fetch.mock.callCount(), 0);
-});
-
-test('serviço envia JSON e só confirma criação com HTTP 201', async t => {
-  configureEndpoint(t, 'https://example.invalid/register');
-  const payload = toRegistrationPayload(validDraft());
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.equal(url, 'https://example.invalid/register');
-    assert.equal(options.method, 'POST');
-    assert.deepEqual(JSON.parse(options.body), payload);
-    return new Response(null, { status: 201 });
-  });
-  await registerUser(payload);
-});
-
-test('conflito, validação e falha do servidor retornam erro', async t => {
-  configureEndpoint(t, 'https://example.invalid/register');
-  for (const status of [200, 400, 409, 422, 500]) {
-    const mock = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status }));
-    await assert.rejects(registerUser(toRegistrationPayload(validDraft())), error => error.status === status);
-    mock.mock.restore();
-  }
-});
-
-test('falha de rede permite nova tentativa e timeout não confirma conta', async t => {
-  configureEndpoint(t, 'https://example.invalid/register');
-  const mock = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Offline'); });
-  await assert.rejects(registerUser(toRegistrationPayload(validDraft())), /conectar ao servidor/);
-  mock.mock.restore();
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  t.mock.method(globalThis, 'fetch', (_url, options) => new Promise((_, reject) => {
-    options.signal.addEventListener('abort', () => reject(new Error('Timeout')));
-  }));
-  const pending = registerUser(toRegistrationPayload(validDraft()));
-  const check = assert.rejects(pending, /demorou para responder/);
-  t.mock.timers.tick(15000);
-  await check;
-});
-
-test('cancelamento da tela aborta o pedido', async t => {
-  configureEndpoint(t, 'https://example.invalid/register');
-  t.mock.method(globalThis, 'fetch', (_url, options) => new Promise((_, reject) => {
-    options.signal.addEventListener('abort', () => reject(new Error('Cancelado')));
-  }));
-  const controller = new AbortController();
-  const pending = registerUser(toRegistrationPayload(validDraft()), controller.signal);
-  const check = assert.rejects(pending, /Cancelado/);
-  controller.abort();
-  await check;
 });

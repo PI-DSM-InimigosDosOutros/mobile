@@ -15,7 +15,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     let active = true;
     AsyncStorage.getItem('@workin/accent').then(value => {
       if (active && !selected.current && accentColors.some(color => color.value === value)) setAccent(value!);
-    }).catch(() => { if (active) setPersistenceMessage('Não foi possível recuperar a cor salva.'); });
+    }).catch(() => { if (active) setPersistenceMessage('Não foi possível recuperar sua cor.'); });
     return () => { active = false; };
   }, []);
 
@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     setPersistenceMessage('');
     // Serializa escolhas rápidas para a última cor também ser a última gravada.
     writes.current = writes.current.then(() => AsyncStorage.setItem('@workin/accent', color))
-      .catch(() => setPersistenceMessage('A cor foi aplicada, mas não pôde ser salva neste dispositivo.'));
+      .catch(() => setPersistenceMessage('Não foi possível salvar sua cor. Tente selecionar novamente.'));
   }
   return <ThemeContext.Provider value={{ ...Colors, accent, setAccentColor, persistenceMessage }}>{children}</ThemeContext.Provider>;
 }

@@ -8,8 +8,8 @@ const catalogue: Exercise[] = [
   { id: 'mock-squat', name: 'Agachamento', category: 'Calistenia', muscles: ['Pernas', 'Glúteos'], estimatedSeconds: 180, description: 'Exercício ilustrativo de membros inferiores.', gifUrl: null },
   { id: 'mock-pushup', name: 'Flexão', category: 'Calistenia', muscles: ['Peitoral', 'Braços'], estimatedSeconds: 240, description: 'Exercício ilustrativo de membros superiores.', gifUrl: null },
   { id: 'mock-plank', name: 'Prancha', category: 'Calistenia', muscles: ['Core'], estimatedSeconds: 180, description: 'Exercício ilustrativo de core.', gifUrl: null },
-  ...['Musculação', 'Aeróbica', 'Cardio', 'Yoga', 'Pilates'].map((category, index) => ({
-    id: `mock-category-${index}`, name: `${category} · exemplo`, category, muscles: ['Corpo inteiro'],
+  ...['Musculação', 'Equilíbrio', 'Cardio', 'Flexibilidade', 'HIIT'].map((category, index) => ({
+    id: `mock-category-${index}`, name: category, category, muscles: ['Corpo inteiro'],
     estimatedSeconds: 120, description: 'Material provisório para testar o fluxo desta modalidade.', gifUrl: null,
   })),
 ];
@@ -23,7 +23,7 @@ export function generateMockWorkout(profile: RegistrationProfile, today = new Da
     return [{ ...item, estimatedSeconds, completed: false }];
   });
   if (!exercises.length) throw new Error('Preencha as modalidades e o tempo disponível no perfil antes de criar o treino.');
-  return { id: `mock-workout-${Date.now()}`, title: 'Treino local', date: localDate(today), exercises };
+  return { id: `mock-workout-${Date.now()}`, title: 'Treino do dia', date: localDate(today), exercises };
 }
 
 export function mockProgress(data: DashboardData, today = new Date()): DashboardData {

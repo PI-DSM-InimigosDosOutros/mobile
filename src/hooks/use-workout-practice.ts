@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { advanceWorkoutProgress, endWorkoutSession, startWorkoutSession } from '@/services/api';
-import type { DailyWorkout, WorkoutSession } from '@/utils/dashboard';
+import type { DailyWorkout, WorkoutSession, ServerSession } from '@/utils/dashboard';
 
 export type Practice = {
   workoutId: string;
@@ -8,6 +8,7 @@ export type Practice = {
   durations: number[];
   completed: boolean[];
   runningSince: number | null;
+  serverSessionId?: string;
 };
 export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: boolean) {
   const [practice, setPractice] = useState<Practice | null>(null);
@@ -36,6 +37,16 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     setPractice({ ...saved, durations, runningSince: null });
   }, []);
 
+  const restoreServer = useCallback((saved: ServerSession, workout: DailyWorkout) => {
+    if (saved.status !== 'active' || String(saved.dailyWorkoutId) !== workout.id) return;
+    const completed = workout.exercises.map((item, index) => Boolean(saved.exercises.find(exercise => exercise.exerciseOrder === (item.order ?? index + 1))?.completed));
+    const durations = workout.exercises.map((item, index) => saved.exercises.find(exercise => exercise.exerciseOrder === (item.order ?? index + 1))?.durationSeconds || 0);
+    const next = completed.findIndex(value => !value);
+    setPractice({ workoutId: workout.id, serverSessionId: String(saved.id), index: next < 0 ? completed.length - 1 : next,
+      completed, durations, runningSince: null });
+    setError('');
+  }, []);
+
   useEffect(() => {
     if (!practice?.runningSince) return;
     const interval = setInterval(() => setNow(Date.now()), 500);
@@ -56,10 +67,15 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     const version = generation.current;
     try {
       const next = workout.exercises.findIndex(item => !item.completed);
-      if (next < 0) throw new Error('Todos os exercícios deste treino já estão concluídos.');
+      if (next < 0 && demo) throw new Error('Todos os exercícios deste treino já estão concluídos.');
       if (!demo) {
-        const result = await startWorkoutSession();
+        const result = await startWorkoutSession(workout.id);
         if (String(result.dailyWorkoutId) !== workout.id) throw new Error('O treino mudou no servidor. Atualize o treino antes de iniciar.');
+        if (version !== generation.current) return false;
+        restoreServer(result.session, workout);
+        setPractice(current => current ? { ...current, runningSince: current.completed.every(Boolean) ? null : Date.now() } : current);
+        setNow(Date.now());
+        return true;
       }
       if (version !== generation.current) return false;
       setNow(Date.now());
@@ -95,10 +111,12 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     const durations = measured(practice);
     setPractice({ ...practice, durations, runningSince: null });
     try {
-      const result = demo ? null : await advanceWorkoutProgress();
+      if (!demo && !practice.serverSessionId) throw new Error('Consulte o progresso para recuperar sua sessão.');
+      const result = demo ? null : await advanceWorkoutProgress(practice.serverSessionId!, workout.exercises[practice.index].order ?? practice.index + 1, durations[practice.index]);
       if (version !== generation.current) return false;
-      const completed = [...practice.completed];
-      completed[practice.index] = true;
+      const completed = result ? workout.exercises.map((item, position) => Boolean(result.session.exercises.find(exercise => exercise.exerciseOrder === (item.order ?? position + 1))?.completed)) : [...practice.completed];
+      if (!result) completed[practice.index] = true;
+      const acceptedDurations = result ? workout.exercises.map((item, position) => result.session.exercises.find(exercise => exercise.exerciseOrder === (item.order ?? position + 1))?.durationSeconds || 0) : durations;
       let next = completed.findIndex(value => !value);
       if (result) {
         if (result.isFinished) next = -1;
@@ -107,7 +125,7 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
           if (next < 0) throw new Error('O próximo exercício retornado não está neste treino. Atualize o treino antes de continuar.');
         }
       }
-      setPractice({ ...practice, durations, completed, index: next < 0 ? practice.index : next, runningSince: next < 0 ? null : Date.now() });
+      setPractice({ ...practice, durations: acceptedDurations, completed, index: next < 0 ? practice.index : next, runningSince: next < 0 ? null : Date.now() });
       setNow(Date.now());
       return next < 0;
     } catch (cause) {
@@ -127,7 +145,16 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     const durations = measured(practice);
     setPractice({ ...practice, durations, runningSince: null });
     try {
-      if (!demo) await endWorkoutSession();
+      if (!demo) {
+        if (!practice.serverSessionId) throw new Error('Consulte o progresso para recuperar sua sessão.');
+        const interrupted = practice.completed[practice.index] ? undefined : {
+          exerciseOrder: workout.exercises[practice.index].order ?? practice.index + 1, durationSeconds: durations[practice.index],
+        };
+        const result = await endWorkoutSession(practice.serverSessionId, interrupted);
+        if (version !== generation.current) return null;
+        setSummary(result); setPractice(null);
+        return result;
+      }
       if (version !== generation.current) return null;
       const result: WorkoutSession = {
         id: `local-${Date.now()}`, title: workout.title, date: workout.date,
@@ -148,6 +175,6 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
 
   const elapsed = practice ? (practice.durations[practice.index] || 0)
     + (practice.runningSince === null ? 0 : Math.max(0, Math.floor((now - practice.runningSince) / 1000))) : 0;
-  return { practice, summary, pending, error, elapsed, checkpoint: Math.floor(now / 2000), begin, pause, resume, advance, finish, reset, restore };
+  return { practice, summary, pending, error, elapsed, checkpoint: Math.floor(now / 2000), begin, pause, resume, advance, finish, reset, restore, restoreServer };
 }
 

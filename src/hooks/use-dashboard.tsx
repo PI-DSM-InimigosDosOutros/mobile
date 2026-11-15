@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { createDemoDashboard } from '@/data/demo-dashboard';
 import type { DashboardData, HistoryFilters } from '@/utils/dashboard';
 import type { RegistrationProfile } from '@/utils/registration';
-import { fetchDailyWorkout } from '@/services/api';
+import { ApiError, fetchDailyWorkout, fetchProfile, saveProfile, fetchHistory, fetchMetrics, createServerWorkout } from '@/services/api';
 import { useSession } from '@/hooks/use-session';
 import { useWorkoutPractice } from '@/hooks/use-workout-practice';
 import { readMock, saveMock } from '@/services/mock-storage';
@@ -18,6 +18,16 @@ function accountData(firstName: string, lastName: string, email: string): Dashbo
   };
 }
 
+async function fetchAccount() {
+  const [profile, history, metrics, workout] = await Promise.all([
+    fetchProfile(), fetchHistory(), fetchMetrics(), fetchDailyWorkout().catch(error => {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }),
+  ]);
+  return { profile, history, ...metrics, workout: workout ?? { id: '', title: 'Treino do dia', date: '', exercises: [] } };
+}
+
 function useDashboardState(initialData?: DashboardData | null) {
   const { session, ready, signOut } = useSession();
   const [data, setData] = useState<DashboardData | null>(() => initialData ?? (session ? accountData(session.user.firstName, session.user.lastName, session.user.email) : null));
@@ -30,7 +40,7 @@ function useDashboardState(initialData?: DashboardData | null) {
   const revision = useRef(0);
   const persistEnabled = useRef(true);
   const practice = useWorkoutPractice(data?.workout, isDemo);
-  const { restore, checkpoint, practice: activePractice } = practice;
+  const { restore, restoreServer, checkpoint, practice: activePractice } = practice;
 
   useEffect(() => {
     if (session || initialData) return;
@@ -41,7 +51,7 @@ function useDashboardState(initialData?: DashboardData | null) {
         setDemo(true);
         restore(saved.practice, saved.data.workout, saved.savedAt);
       }
-    }).catch(() => { if (active) setStorageError('Não foi possível recuperar os dados locais.'); })
+    }).catch(() => { if (active) setStorageError('Não foi possível recuperar suas informações.'); })
       .finally(() => { if (active) setLocalReady(true); });
     return () => { active = false; };
   }, [session, initialData, restore]);
@@ -51,36 +61,42 @@ function useDashboardState(initialData?: DashboardData | null) {
     let active = true;
     saveMock({ version: 1, active: true, savedAt: Date.now(), data, practice: activePractice })
       .then(() => { if (active) setStorageError(''); })
-      .catch(() => { if (active) setStorageError('Não foi possível salvar os dados locais. Confira o armazenamento e tente novamente.'); });
+      .catch(() => { if (active) setStorageError('Não foi possível salvar suas alterações. Tente novamente.'); });
     return () => { active = false; };
   }, [data, isDemo, localReady, activePractice, checkpoint]);
   const loadWorkout = useCallback(async () => {
     if (!session || isDemo) return;
     const version = ++revision.current;
     try {
-      const workout = await fetchDailyWorkout();
-      if (version === revision.current) setData(current => current ? { ...current, workout } : current);
+      const account = await fetchAccount();
+      if (version === revision.current) {
+        setData(account);
+        if ('activeSession' in account.workout && account.workout.activeSession) restoreServer(account.workout.activeSession, account.workout);
+      }
     } catch (cause) {
       if (version === revision.current) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o treino.');
     } finally { if (version === revision.current) setLoading(false); }
-  }, [session, isDemo]);
+  }, [session, isDemo, restoreServer]);
 
   useEffect(() => {
     if (!session || !ready || isDemo) return;
     let active = true;
-    fetchDailyWorkout().then(workout => {
-      if (active) setData(current => current ? { ...current, workout } : current);
+    fetchAccount().then(account => {
+      if (active) {
+        setData(account);
+        if ('activeSession' in account.workout && account.workout.activeSession) restoreServer(account.workout.activeSession, account.workout);
+      }
     }).catch(cause => {
       if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o treino.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [session, ready, isDemo]);
+  }, [session, ready, isDemo, restoreServer]);
 
   async function refresh() {
     if (isDemo) {
       if (data) {
         await saveMock({ version: 1, active: true, savedAt: Date.now(), data, practice: activePractice })
-          .then(() => setStorageError('')).catch(() => setStorageError('Não foi possível salvar os dados locais.'));
+          .then(() => setStorageError('')).catch(() => setStorageError('Não foi possível salvar suas alterações.'));
       }
       return;
     }
@@ -120,7 +136,7 @@ function useDashboardState(initialData?: DashboardData | null) {
   }
   async function registerLocal(profile: RegistrationProfile) {
     const saved = await readMock();
-    if (saved) throw new Error('Já existe um perfil local neste dispositivo. Abra o modo local para editar seus dados.');
+    if (saved) throw new Error('Seu perfil já está cadastrado. Acesse seus treinos e edite seus dados na Conta.');
     const local = createLocalDashboard(profile);
     await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: null });
     persistEnabled.current = true;
@@ -128,15 +144,28 @@ function useDashboardState(initialData?: DashboardData | null) {
     setData(local);
     setDemo(true);
   }
-  async function updateDemoProfile(profile: RegistrationProfile) {
-    if (!isDemo || !data) return;
-    const local = mockProgress({ ...data, profile });
+  async function updateDemoProfile(profile: Partial<RegistrationProfile>) {
+    if (!data) return;
+    if (!isDemo) {
+      const updated = await saveProfile(profile);
+      setData(current => current ? { ...current, profile: updated } : current);
+      void fetchMetrics().then(metrics => setData(current => current ? { ...current, ...metrics } : current))
+        .catch(() => setError('Seus dados foram salvos, mas não foi possível atualizar sua sequência.'));
+      return;
+    }
+    const local = mockProgress({ ...data, profile: { ...data.profile, ...profile } });
     await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: activePractice });
     setData(local);
   }
   async function createWorkout() {
-    if (!isDemo || !data) throw new Error('A criação de treino na conta aguarda a operação do servidor.');
+    if (!data) throw new Error('Não foi possível criar um treino agora. Tente novamente mais tarde.');
     if (activePractice) throw new Error('Finalize ou encerre o treino em andamento antes de criar outro.');
+    if (!isDemo) {
+      const workout = await createServerWorkout();
+      practice.reset();
+      setData(current => current ? { ...current, workout } : current);
+      return;
+    }
     const local = { ...data, workout: generateMockWorkout(data.profile) };
     await saveMock({ version: 1, active: true, savedAt: Date.now(), data: local, practice: null });
     practice.reset();
@@ -144,10 +173,11 @@ function useDashboardState(initialData?: DashboardData | null) {
   }
   function keepSummary(summary: NonNullable<typeof practice.summary>) {
     if (isDemo) { setData(current => current ? recordMockSummary(current, summary) : current); return; }
-    // Na conta real o backend ainda não oferece histórico; os resumos ficam em memória.
+    void fetchMetrics().then(metrics => setData(current => current ? { ...current, ...metrics } : current))
+      .catch(() => setError('O treino foi salvo, mas não foi possível atualizar sua sequência. Atualize a consulta.'));
     setData(current => current ? {
       ...current,
-      history: [summary, ...current.history],
+      history: [summary, ...current.history.filter(item => item.id !== summary.id)],
       workout: { ...current.workout, exercises: current.workout.exercises.map((exercise, index) => ({
         ...exercise, completed: summary.exercises[index]?.completed ?? exercise.completed,
       })) },

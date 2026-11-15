@@ -15,7 +15,7 @@ export default function ModalScreen() {
   if (!data && (screen === 'recuperacao' || screen === 'aparencia' || screen === 'sobre' || screen === 'ajuda')) {
     return <PreviewModal title={previewTitles[screen]}><AccountPreview screen={screen} /></PreviewModal>;
   }
-  if (!data) return <PreviewModal title="Entre na sua conta"><ThemedText>Entre na sua conta ou abra a demonstração para acessar esta tela.</ThemedText></PreviewModal>;
+  if (!data) return <PreviewModal title="Seu próximo movimento"><ThemedText>Volte ao início para acessar seus treinos.</ThemedText></PreviewModal>;
   let content;
   switch (screen) {
     case 'dados': case 'medidas': case 'preferencias': case 'metas': case 'disponibilidade': case 'aparencia':

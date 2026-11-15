@@ -61,7 +61,7 @@ function AccountContent({ profile }: { profile: RegistrationProfile }) {
     <SectionHeading title="Aparência" />
     <AccentPalette />
     <ActionButton title="Abrir personalização" outlined onPress={() => openPreview('aparencia')} />
-    <ThemedText type="technical">A cor fica salva neste dispositivo.</ThemedText>
+    <ThemedText type="technical">Sua cor, seu ritmo.</ThemedText>
   </View>;
 }
 

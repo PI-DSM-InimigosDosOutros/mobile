@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createDemoDashboard } from '../src/data/demo-dashboard.ts';
 import { ageFromBirthDate, filterHistory, filterSessionHistory, formatDate, formatDuration, historySummary } from '../src/utils/dashboard.ts';
 import { adaptBackendWorkout } from '../src/services/workoutAdapter.ts';
+import { adaptFinishedWorkout } from '../src/services/historyAdapter.ts';
+import { adaptUserProfile } from '../src/services/userAdapter.ts';
+import { toProfilePatch } from '../src/utils/registration.ts';
 import { createLocalDashboard, generateMockWorkout, mockProgress, recordMockSummary } from '../src/utils/mock-dashboard.ts';
 import { profileToDraft, toProfilePayload } from '../src/utils/registration.ts';
 
@@ -51,13 +54,13 @@ test('edição de perfil reaproveita normalização sem exigir ou transportar se
   const draft = profileToDraft(data.profile);
   draft.fullName = '  Alex   Exemplo  ';
   draft.minutes = '30';
-  draft.categories.push('Pilates');
+  draft.categories.push('Equilíbrio');
   const profile = toProfilePayload(draft);
   assert.equal(profile.fullName, 'Alex Exemplo');
   assert.equal(profile.availableMinutesPerDay, 30);
   assert.equal('password' in profile, false);
   assert.equal('confirmPassword' in profile, false);
-  assert.ok(!data.profile.exerciseCategories.includes('Pilates'));
+  assert.ok(!data.profile.exerciseCategories.includes('Equilíbrio'));
   assert.equal(JSON.stringify(data.history), originalHistory);
   assert.equal(JSON.stringify(data.workout), originalWorkout);
   assert.throws(() => toProfilePayload({ ...draft, accentColor: '#000000' }), /Cor de destaque/);
@@ -91,12 +94,12 @@ test('filtros de histórico combinam situação com intervalo inclusivo e aceita
 });
 
 test('treino mock usa apenas modalidades escolhidas e respeita o tempo sem modificar o perfil', () => {
-  const profile = { ...createDemoDashboard().profile, exerciseCategories: ['Yoga'], availableMinutesPerDay: 1 };
+  const profile = { ...createDemoDashboard().profile, exerciseCategories: ['Flexibilidade'], availableMinutesPerDay: 1 };
   const workout = generateMockWorkout(profile, new Date(2026, 10, 15));
   assert.equal(workout.date, '2026-11-15');
-  assert.ok(workout.exercises.every(item => item.category === 'Yoga' && !item.completed && item.gifUrl === null));
+  assert.ok(workout.exercises.every(item => item.category === 'Flexibilidade' && !item.completed && item.gifUrl === null));
   assert.ok(workout.exercises.reduce((total, item) => total + item.estimatedSeconds, 0) <= 60);
-  assert.deepEqual(profile.exerciseCategories, ['Yoga']);
+  assert.deepEqual(profile.exerciseCategories, ['Flexibilidade']);
   assert.throws(() => generateMockWorkout({ ...profile, exerciseCategories: [] }), /modalidades/);
   assert.equal(createLocalDashboard(profile).history.length, 0);
 });
@@ -110,4 +113,19 @@ test('sequência local conta conclusão integral e interrompe em dia programado 
   assert.equal(mockProgress(first, new Date(2026, 10, 17)).currentStreak, 0);
   const partial = { ...summary, status: 'ended' };
   assert.equal(mockProgress({ ...data, history: [partial] }, new Date(2026, 10, 15)).currentStreak, 0);
+});
+
+test('contratos da API preservam resumo integral/parcial e perfil sem misturar exemplos', () => {
+  const summary = { id: 45, date: '2026-11-15', title: 'Treino do dia', status: 'ended', durationSeconds: 12.5,
+    exercises: [{ name: 'Agachamento', completed: true, durationSeconds: 10 }, { name: 'Flexão', completed: false, durationSeconds: 2.5 }] };
+  assert.deepEqual(adaptFinishedWorkout(summary), { ...summary, id: '45' });
+  assert.throws(() => adaptFinishedWorkout({ ...summary, id: undefined }), /incompleto/);
+  const profile = createDemoDashboard().profile;
+  assert.equal(adaptUserProfile(profile).fullName, profile.fullName);
+  assert.throws(() => adaptUserProfile({ firstName: 'Perfil antigo' }), /incompleto/);
+  const draft = profileToDraft(profile);
+  const patch = toProfilePatch(draft, 0);
+  assert.deepEqual(Object.keys(patch).sort(), ['birthDate', 'email', 'fullName', 'gender']);
+  assert.equal('password' in patch, false);
+  assert.equal('heightCm' in patch, false);
 });

@@ -1,4 +1,4 @@
-import type { DailyWorkout, Exercise } from '@/utils/dashboard';
+import type { DailyWorkout, Exercise, ServerSession } from '@/utils/dashboard';
 
 export interface BackendExercise {
   exerciseOrder: number;
@@ -15,9 +15,10 @@ export interface BackendWorkoutResponse {
   date: string;
   totalDurationMinutes: number;
   exercises: BackendExercise[];
+  activeSession?: ServerSession | null;
 }
 
-export function adaptBackendWorkout(backendData: BackendWorkoutResponse): DailyWorkout {
+export function adaptBackendWorkout(backendData: BackendWorkoutResponse): DailyWorkout & { activeSession?: ServerSession | null } {
   if (!backendData || !backendData.dailyWorkoutId || !Array.isArray(backendData.exercises)) {
     throw new Error('O servidor retornou um treino incompleto.');
   }
@@ -52,5 +53,6 @@ export function adaptBackendWorkout(backendData: BackendWorkoutResponse): DailyW
     title: exercises.length > 0 ? exercises[0].category : 'Treino do Dia',
     date: backendData.date.split('T')[0],
     exercises: exercises,
+    activeSession: backendData.activeSession,
   };
 }

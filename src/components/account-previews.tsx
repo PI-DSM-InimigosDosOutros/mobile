@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { recoverPassword } from '@/services/api';
+import { recoverPassword, changePassword } from '@/services/api';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
 import { router } from 'expo-router';
@@ -12,7 +12,7 @@ import { AvailabilityStep, PersonalStep, PhysicalStep, PreferencesStep } from '@
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { closePreview, openPreview, type PreviewScreenName } from '@/utils/preview-navigation';
-import { initialRegistration, profileToDraft, toProfilePayload, validateRegistrationStep, type RegistrationErrors, type RegistrationProfile } from '@/utils/registration';
+import { initialRegistration, profileToDraft, toProfilePatch, validateRegistrationStep, passwordRequirements, type RegistrationErrors, type RegistrationProfile } from '@/utils/registration';
 
 export type AccountPreviewName = 'dados' | 'medidas' | 'preferencias' | 'metas' | 'disponibilidade' | 'aparencia' | 'configuracoes' | 'seguranca' | 'recuperacao' | 'ajuda' | 'sobre' | 'saida';
 
@@ -26,6 +26,9 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
 
   async function handleRecovery() {
     if (busy.current) return;
@@ -48,28 +51,27 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
     if (Object.keys(validation).length) { setMessage('Revise os campos indicados.'); return; }
     busy.current = true; setPending(true);
     try {
-      await dashboard.updateDemoProfile(toProfilePayload(value));
-      setMessage('Alteração salva neste dispositivo.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o perfil local.'); }
+      await dashboard.updateDemoProfile(toProfilePatch(value, step));
+      setMessage('Alterações salvas.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar suas alterações.'); }
     finally { busy.current = false; setPending(false); }
   }
   const editProps = {
     draft, errors,
-    onChange: dashboard.isDemo ? (patch: Partial<typeof draft>) => { setDraft(current => ({ ...current, ...patch })); setMessage(''); } : undefined,
+    onChange: (patch: Partial<typeof draft>) => { setDraft(current => ({ ...current, ...patch })); setMessage(''); },
   };
   const feedback = <>
-    {!dashboard.isDemo && ['dados', 'medidas', 'metas', 'disponibilidade'].includes(screen) && <ThemedText type="technical">A edição deste perfil aguarda a operação de atualização da conta no servidor.</ThemedText>}
     {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
   </>;
   switch (screen) {
     case 'dados': return <>
       <PersonalStep {...editProps} />{feedback}
       <ActionButton title="Ver medidas e atividade" outlined onPress={() => openPreview('medidas')} />
-      <ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(0) : undefined} />
+      <ActionButton title="Salvar alterações" loading={pending} onPress={() => savePreview(0)} />
     </>;
-    case 'medidas': return <><PhysicalStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(1) : undefined} /></>;
-    case 'metas': return <><PreferencesStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(2) : undefined} /></>;
-    case 'disponibilidade': return <><AvailabilityStep {...editProps} />{feedback}<ActionButton title={dashboard.isDemo ? 'Salvar no dispositivo' : 'Atualização indisponível'} onPress={dashboard.isDemo ? () => savePreview(3) : undefined} /></>;
+    case 'medidas': return <><PhysicalStep {...editProps} />{feedback}<ActionButton title="Salvar alterações" loading={pending} onPress={() => savePreview(1)} /></>;
+    case 'metas': return <><PreferencesStep {...editProps} />{feedback}<ActionButton title="Salvar alterações" loading={pending} onPress={() => savePreview(2)} /></>;
+    case 'disponibilidade': return <><AvailabilityStep {...editProps} />{feedback}<ActionButton title="Salvar alterações" loading={pending} onPress={() => savePreview(3)} /></>;
     case 'preferencias': return <>
       <ThemedText type="title">Seu treino,{ '\n' }seu ritmo.</ThemedText>
       <ThemedText>Confira os grupos de informações usados para personalizar seus próximos treinos.</ThemedText>
@@ -83,7 +85,7 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       <ThemedText type="title">Do seu jeito</ThemedText>
       <AccentPalette />
       <Artwork name="checker" width="100%" height={48} />
-      <ThemedText>A cor selecionada aparece imediatamente nas telas. Sua escolha fica salva neste dispositivo.</ThemedText>
+      <ThemedText>Escolha a cor que combina com seu ritmo. Seu estilo acompanha cada tela.</ThemedText>
     </>;
     case 'configuracoes': return <>
       <ThemedText type="title">Ajuste seu espaço</ThemedText>
@@ -95,15 +97,24 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       ]} />
     </>;
     case 'seguranca': return <>
-      {dashboard.isDemo && <ThemedText type="technical">O modo local não usa senha. Recuperação e redefinição de acesso atuam somente na conta do servidor.</ThemedText>}
       <ThemedText type="label">E-mail da conta</ThemedText>
       <FormField label="E-mail" value={profile?.email ?? ''} />
       <ThemedText type="label">Alterar senha</ThemedText>
-      <FormField label="Senha atual" placeholder="SENHA ATUAL..." password value="" />
-      <FormField label="Nova senha" placeholder="NOVA SENHA..." password value="" />
-      <FormField label="Confirmar nova senha" placeholder="CONFIRME A NOVA SENHA..." password value="" />
-      <ThemedText type="technical">A troca de senha pela conta aguarda uma operação autenticada no servidor. Para redefinir por e-mail, use a recuperação de acesso.</ThemedText>
-      <ActionButton title="Visualizar recuperação de acesso" outlined onPress={() => openPreview('recuperacao')} />
+      <FormField label="Senha atual" placeholder="SENHA ATUAL..." password editable={!dashboard.isDemo} value={currentPassword} onChangeText={setCurrentPassword} />
+      <FormField label="Nova senha" placeholder="NOVA SENHA..." password editable={!dashboard.isDemo} value={newPassword} onChangeText={setNewPassword} />
+      <FormField label="Confirmar nova senha" placeholder="CONFIRME A NOVA SENHA..." password editable={!dashboard.isDemo} value={confirmation} onChangeText={setConfirmation} />
+      {!dashboard.isDemo && <ActionButton title="Alterar senha" loading={pending} onPress={async () => {
+        if (busy.current) return;
+        if (!currentPassword || newPassword !== confirmation || passwordRequirements(newPassword).some(rule => !rule.met)) {
+          setMessage('Confira a senha atual, os requisitos da nova senha e a confirmação.'); return;
+        }
+        busy.current = true; setPending(true); setMessage('');
+        try { await changePassword(currentPassword, newPassword); setMessage('Senha atualizada.'); setCurrentPassword(''); setNewPassword(''); setConfirmation(''); }
+        catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível alterar sua senha.'); }
+        finally { busy.current = false; setPending(false); }
+      }} />}{feedback}
+      <ThemedText type="technical">Para redefinir sua senha, solicite as instruções por e-mail.</ThemedText>
+      <ActionButton title="Recuperar acesso" outlined onPress={() => openPreview('recuperacao')} />
     </>;
     case 'recuperacao': return <>
       <Artwork name="arrow" width={70} />
@@ -119,20 +130,20 @@ export function AccountPreview({ screen, profile }: { screen: AccountPreviewName
       <ThemedText type="label">02 · Seu treino</ThemedText>
       <ThemedText>Treino do dia apresenta a sequência, a duração estimada e os grupos musculares. Confirme o início para acompanhar o tempo, pausar e concluir cada exercício.</ThemedText>
       <ThemedText type="label">03 · Seu progresso</ThemedText>
-      <ThemedText>Treinos anteriores diferencia sessões concluídas e encerradas manualmente. No modo local, perfil e resumos ficam salvos neste dispositivo. Na conta real, o histórico definitivo ainda está em integração.</ThemedText>
+      <ThemedText>Consulte seus treinos anteriores, confira o tempo de prática e acompanhe sua sequência. Sessões concluídas e encerradas antes do fim aparecem separadamente.</ThemedText>
       <ActionButton title="Entender a sequência" outlined onPress={() => openPreview('sequencia')} />
     </>;
     case 'sobre': return <>
       <Artwork name="logo" width={157} height={124} label="WorkIn" />
       <ThemedText type="title">Seu espaço.{ '\n' }Seu movimento.</ThemedText>
       <ThemedText>WorkIn é um projeto acadêmico de aplicativo para treinos personalizados em casa.</ThemedText>
-      <ThemedText>Esta versão inclui autenticação, recuperação de acesso e acompanhamento de treinos conforme os serviços disponíveis. Cadastro completo, edição da conta e histórico definitivo ainda estão em integração.</ThemedText>
-      <ThemedText type="technical" accent>VERSÃO EM DESENVOLVIMENTO</ThemedText>
+      <ThemedText>Organize sua rotina, acompanhe cada exercício e celebre seus movimentos. Um treino de cada vez, no seu ritmo.</ThemedText>
+      <ThemedText type="technical" accent>WORKIN · SEU ESPAÇO DE TREINO</ThemedText>
     </>;
     case 'saida': return <>
       <ThemedText type="title">Voltar ao início?</ThemedText>
-      <ThemedText>Ao sair, a sessão da conta será removida. Os dados do modo local permanecem neste dispositivo para continuar depois.</ThemedText>
-      <ActionButton title="Continuar nas telas" onPress={closePreview} />
+      <ThemedText>Deseja sair agora? Você poderá voltar e continuar sua jornada.</ThemedText>
+      <ActionButton title="Continuar treinando" onPress={closePreview} />
       <ActionButton title="Sair da conta" outlined loading={pending} onPress={async () => {
         if (busy.current) return;
         busy.current = true;

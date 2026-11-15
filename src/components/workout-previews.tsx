@@ -7,7 +7,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useState } from 'react';
-import { formatDuration, type DashboardData, type Exercise } from '@/utils/dashboard';
+import { formatDuration, workoutLabel, exerciseLabel, exerciseDescription, type DashboardData, type Exercise } from '@/utils/dashboard';
 import { closePreview, openPreview, replacePreview } from '@/utils/preview-navigation';
 
 export type WorkoutPreviewName = 'criar-treino' | 'exercicio' | 'treino' | 'execucao' | 'pausa' | 'encerramento' | 'conclusao';
@@ -29,15 +29,14 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
     return <>
       <ThemedText type="title">Seu treino, do seu jeito</ThemedText>
       <ThemedText>O treino será montado automaticamente com as preferências do seu cadastro.</ThemedText>
-      <ThemedText type="label" accent>{dashboard.isDemo ? "Preferências do perfil local" : "Preferências da conta"}</ThemedText>
+      <ThemedText type="label" accent>Suas preferências</ThemedText>
       <ThemedText>Meta: {goal || 'Ainda não informada'}{'\n'}Modalidades: {exerciseCategories.join(', ') || 'Ainda não informadas'}{'\n'}Tempo disponível: {availableMinutesPerDay > 0 ? `${availableMinutesPerDay} min/dia` : 'Ainda não informado'}</ThemedText>
-      <ThemedText type="technical">{dashboard.isDemo ? 'Geração simulada com catálogo ilustrativo, modalidades selecionadas e limite de tempo. Não é prescrição de treino. O resultado fica neste dispositivo.' : 'A geração aguarda a operação de criação e as preferências no servidor.'}</ThemedText>
-      {dashboard.isDemo && <ActionButton title="Criar treino local" loading={creating} disabled={Boolean(current)} onPress={async () => {
+      <ActionButton title="Criar meu treino" loading={creating} disabled={Boolean(current)} onPress={async () => {
         setCreating(true); setMessage('');
         try { await dashboard.createWorkout(); closePreview(); }
         catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar o treino.'); }
         finally { setCreating(false); }
-      }} />}
+      }} />
       {Boolean(current) && <ThemedText>Encerre o treino em andamento antes de criar outro.</ThemedText>}
       {Boolean(message) && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
       <ActionButton title="Voltar ao treino do dia" outlined onPress={closePreview} />
@@ -52,21 +51,21 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
 
   switch (screen) {
     case 'treino': return <>
-      <ThemedText type="title">{data.workout.title}</ThemedText>
+      <ThemedText type="title">{workoutLabel(data.workout.title)}</ThemedText>
       <ThemedText>{exercises.length} exercícios · {formatDuration(exercises.reduce((sum, item) => sum + item.estimatedSeconds, 0))} estimados</ThemedText>
-      {exercises.map((item, position) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Ver exercício ${item.name}`}
+      {exercises.map((item, position) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Ver exercício ${exerciseLabel(item.name)}`}
         onPress={() => openPreview('exercicio', item.id)} style={[styles.row, { borderColor: theme.border }]}>
         <ThemedText type="technical" accent>{String(position + 1).padStart(2, '0')}</ThemedText>
-        <View style={styles.grow}><ThemedText type="label">{item.name}</ThemedText><ThemedText type="technical">{item.muscles.join(' · ')}</ThemedText></View>
+        <View style={styles.grow}><ThemedText type="label">{exerciseLabel(item.name)}</ThemedText><ThemedText type="technical">{item.muscles.join(' · ')}</ThemedText></View>
         <ThemedText type="technical">{formatDuration(item.estimatedSeconds)}</ThemedText>
       </Pressable>)}
       <ActionButton title="Visualizar execução" icon="dumbbell" onPress={() => openPreview('execucao', exercises[0]?.id)} />
       <ThemedText type="technical">Na próxima tela, confirme o início para acompanhar o tempo e concluir cada exercício.</ThemedText>
     </>;
     case 'exercicio': return <>
-      <ThemedText type="title" accessibilityRole="header">{exercise.name}</ThemedText>
+      <ThemedText type="title" accessibilityRole="header">{exerciseLabel(exercise.name)}</ThemedText>
       <ExerciseMaterial key={exercise.id} exercise={exercise} />
-      <ThemedText>{exercise.description}</ThemedText>
+      <ThemedText>{exerciseDescription(exercise)}</ThemedText>
       <ThemedText type="label">Informações do exercício</ThemedText>
       <ThemedText>Modalidade: {exercise.category}{'\n'}Grupos: {exercise.muscles.join(', ')}{'\n'}Tempo estimado: {formatDuration(exercise.estimatedSeconds)}</ThemedText>
       <ActionButton title="Ver na execução" onPress={() => openPreview('execucao', exercise.id)} />
@@ -76,7 +75,7 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
       <View style={[styles.track, { backgroundColor: theme.field }]}>
         <View style={{ height: '100%', width: `${(index + 1) / exercises.length * 100}%`, backgroundColor: theme.accent }} />
       </View>
-      <ThemedText type="title" accessibilityRole="header">{exercise.name}</ThemedText>
+      <ThemedText type="title" accessibilityRole="header">{exerciseLabel(exercise.name)}</ThemedText>
       <ExerciseMaterial key={exercise.id} exercise={exercise} />
       <ThemedText style={[styles.timer, { color: theme.accent }]}>{formatDuration(current ? Math.max(0, exercise.estimatedSeconds - session.elapsed) : exercise.estimatedSeconds)}</ThemedText>
       <ThemedText type="technical">{current ? 'TEMPO DECORRIDO: ' + formatDuration(session.elapsed) : 'TEMPO ESTIMADO · CONFIRME O INÍCIO'}</ThemedText>
@@ -91,12 +90,11 @@ export function WorkoutPreview({ screen, data, id }: { screen: WorkoutPreviewNam
         <ActionButton title="Encerrar treino" outlined disabled={session.pending} onPress={() => { session.pause(); openPreview('encerramento', exercise.id); }} />
       </>}
       {Boolean(session.error) && !dashboard.isDemo && <ActionButton title="Consultar progresso novamente" outlined onPress={() => { session.reset(); void dashboard.refresh(); }} />}
-      <ThemedText type="technical">{dashboard.isDemo ? 'Demonstração com medição local de tempo.' : 'Início e conclusões usam sua conta. O histórico definitivo aguarda a evolução do serviço.'}</ThemedText>
     </>;
     case 'pausa': return <>
       <Artwork name="stripes" width={80} />
       <ThemedText type="title">Respire.{'\n'}A gente espera.</ThemedText>
-      <ThemedText>{exercise.name} · {index + 1} de {exercises.length}</ThemedText>
+      <ThemedText>{exerciseLabel(exercise.name)} · {index + 1} de {exercises.length}</ThemedText>
       <ThemedText>Tempo pausado. Continue quando estiver pronto.</ThemedText>
       <ActionButton title="Retomar treino" disabled={!current} onPress={() => { session.resume(); replacePreview('execucao', exercise.id); }} />
       <ActionButton title="Encerrar treino" outlined disabled={!current} onPress={() => openPreview('encerramento', exercise.id)} />
@@ -123,8 +121,8 @@ function ExerciseMaterial({ exercise }: { exercise: Exercise }) {
   const theme = useTheme();
   const [failed, setFailed] = useState(false);
   return <View style={[styles.material, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-    {exercise.gifUrl && !failed ? <Image source={{ uri: exercise.gifUrl }} onError={() => setFailed(true)} style={styles.gif} contentFit="contain" accessibilityLabel={`Demonstração de ${exercise.name}`} /> :
-      <><Artwork name="person" width={70} height={90} /><ThemedText type="technical">DEMONSTRAÇÃO VISUAL INDISPONÍVEL</ThemedText></>}
+    {exercise.gifUrl && !failed ? <Image source={{ uri: exercise.gifUrl }} onError={() => setFailed(true)} style={styles.gif} contentFit="contain" accessibilityLabel={`Demonstração de ${exerciseLabel(exercise.name)}`} /> :
+      <><Artwork name="person" width={70} height={90} /><ThemedText type="technical">{exercise.category.toUpperCase()} · {exercise.muscles.join(' / ')}</ThemedText></>}
   </View>;
 }
 const styles = StyleSheet.create({
