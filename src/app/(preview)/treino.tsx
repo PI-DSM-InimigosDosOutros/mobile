@@ -27,6 +27,14 @@ export default function TodayScreen() {
 
 function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: DailyWorkout; availableMinutes: number; exerciseId?: string }) {
   const theme = useTheme();
+  const { practice } = useDashboard();
+  const completed = !practice.practice && workout.exercises.every(item => item.completed);
+  async function train() {
+    if (practice.practice) {
+      practice.resume();
+      openPreview('execucao');
+    } else if (await practice.begin()) openPreview('execucao');
+  }
   const index = Math.max(0, workout.exercises.findIndex(item => item.id === exerciseId));
   const exercise = workout.exercises[index];
   const duration = workout.exercises.reduce((sum, item) => sum + item.estimatedSeconds, 0);
@@ -74,9 +82,11 @@ function WorkoutOverview({ workout, availableMinutes, exerciseId }: { workout: D
     </View>
     <ActionButton title="Visualizar exercício" outlined onPress={() => openPreview('exercicio', exercise.id)} />
     <View style={styles.training}><Artwork name="checker" width={74} height={44} /><View style={styles.grow}>
-      <ActionButton title="Revisar treino" icon="dumbbell" onPress={() => openPreview('treino')} />
+      <ActionButton title="Ver treino completo" icon="dumbbell" onPress={() => openPreview('treino')} />
     </View></View>
-    <ActionButton title="Visualizar execução" onPress={() => openPreview('execucao', exercise.id)} />
+    {Boolean(practice.error) && <ThemedText accessibilityRole="alert">{practice.error}</ThemedText>}
+    <ActionButton title={completed ? 'Ver treinos anteriores' : practice.practice ? 'Continuar treino' : 'Treinar'} icon="dumbbell"
+      loading={practice.pending} onPress={completed ? () => router.navigate('/(preview)/anteriores') : () => void train()} />
     <ThemedText type="technical">Prepare seu espaço e comece quando estiver pronto. Você pode pausar a qualquer momento.</ThemedText>
   </View>;
 }

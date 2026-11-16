@@ -24,7 +24,7 @@ Configure `.env` conforme `.env.example` e reinicie o Expo:
 - `EXPO_PUBLIC_DATA_MODE=api`: cadastro envia o formulário completo para `/api/user/register`, guarda o JWT e abre a conta retornada pelo servidor.
 - `EXPO_PUBLIC_API_URL`: endereço do backend, com ou sem `/api`. Na web local, http://localhost:3000; no celular, usar o IP acessível do computador. Nunca colocar credenciais do banco, chaves ou segredos em EXPO_PUBLIC_*.
 
-Login com e-mail/senha sempre usa a API. Uma conta autenticada consulta perfil, treino, histórico e métricas do servidor e usa as operações reais de geração, início, conclusão de exercício, finalização, edição de perfil e alteração de senha. Uma falha da API não ativa o mock automaticamente. O atalho de apresentação continua restrito ao desenvolvimento.
+No modo mock, Entrar abre o perfil de apresentação e ignora JWTs antigos, sem consultar a API. No modo api, login usa e-mail/senha no servidor. Uma conta autenticada consulta perfil, treino, histórico e métricas do servidor e usa as operações reais de geração, início, conclusão de exercício, finalização, edição de perfil e alteração de senha. Uma falha da API não ativa o mock automaticamente. O atalho de apresentação continua restrito ao desenvolvimento.
 
 O backend precisa da migração `src/migrations/001_workout_sessions.sql` e da configuração da equipe antes de ativar a integração real. Consulte o README do repositório backend para os contratos, preparação e limitações.
 
@@ -46,3 +46,5 @@ O rascunho de cadastro continua necessário para os campos e é salvo sem senha/
 ## Validação
 
 Os testes verificam normalização, limites do banco, contratos de resposta, filtros, resumos e o modo de apresentação. Os testes de navegador usam respostas controladas da API e não substituem a execução com o MySQL, SMTP e Gemini reais. A aplicação da migração e os testes no Alwaysdata permanecem com a equipe, pois as credenciais não estão disponíveis neste ambiente.
+
+Fluxo de treino e configuração para gravação: [FLUXO-TREINO.md](FLUXO-TREINO.md).

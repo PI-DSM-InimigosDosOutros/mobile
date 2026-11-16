@@ -11,7 +11,7 @@ import { initialRegistration, toProfilePayload, toRegistrationPayload, validateR
 import { useRef, useState } from 'react';
 import { useRegistration } from '@/hooks/use-registration';
 import { useDashboard } from '@/hooks/use-dashboard';
-import { registerAccount, useMockRegistration } from '@/services/api';
+import { registerAccount, isMockMode } from '@/services/api';
 import { useSession } from '@/hooks/use-session';
 
 const steps = [PersonalStep, PhysicalStep, PreferencesStep, AvailabilityStep, SecurityStep];
@@ -49,7 +49,7 @@ export default function RegisterScreen() {
       if (invalidStep !== undefined) { navigateToStep(invalidStep); return; }
       busy.current = true; setPending(true);
       try {
-        if (useMockRegistration) await dashboard.registerLocal(toProfilePayload(current));
+        if (isMockMode) await dashboard.registerLocal(toProfilePayload(current));
         else {
           const session = await registerAccount(toRegistrationPayload(current));
           await dashboard.leaveDemo();

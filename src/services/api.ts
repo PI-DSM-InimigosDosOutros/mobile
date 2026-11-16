@@ -5,6 +5,8 @@ import type { ServerSession, WorkoutSession, WeekActivity } from '@/utils/dashbo
 import { adaptFinishedWorkout } from './historyAdapter';
 import { adaptUserProfile, type BackendUserProfile } from './userAdapter';
 
+export const isMockMode = process.env.EXPO_PUBLIC_DATA_MODE !== 'api';
+
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {
     super(message);
@@ -20,6 +22,7 @@ export function apiUrl(path: string) {
 }
 
 async function request<T>(path: string, body?: object, authenticated = false, method?: 'PUT'): Promise<T> {
+  if (isMockMode) throw new ApiError('Esta ação não está disponível no momento. Você pode continuar acessando seus treinos.');
   const url = apiUrl(path);
   const session = authenticated ? await readSession() : null;
   if (authenticated && !session) throw new ApiError('Entre na sua conta para continuar.', 401);
@@ -80,7 +83,6 @@ export async function registerAccount(payload: RegistrationPayload) {
   if (!isAuthSession(result)) throw new ApiError('A resposta de cadastro está incompleta.');
   return result;
 }
-export const useMockRegistration = process.env.EXPO_PUBLIC_DATA_MODE !== 'api';
 export const fetchProfile = async () => adaptUserProfile(await request<BackendUserProfile>('user/profile', undefined, true));
 export const saveProfile = async (profile: Partial<RegistrationProfile>) => adaptUserProfile(await request<BackendUserProfile>('user/profile', profile, true, 'PUT'));
 export const changePassword = (currentPassword: string, newPassword: string) => request('user/change-password', { currentPassword, newPassword }, true);

@@ -31,3 +31,5 @@ Não há autenticação por senha no modo mock. Recuperação por e-mail e alter
 - Histórico anterior sem tempos/situação não pode ser reconstruído automaticamente. A retomada da API recupera o progresso confirmado, sem o tempo ainda não enviado do exercício que estava aberto.
 
 Os limites da IA são por processo e não substituem a cota de gastos do provedor. Nenhum desses serviços externos foi acionado usando credenciais reais nesta implementação.
+
+Fluxo de treino e configuração para gravação: [FLUXO-TREINO.md](FLUXO-TREINO.md).

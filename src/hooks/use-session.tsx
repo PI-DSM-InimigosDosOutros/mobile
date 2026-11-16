@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 import { readSession, writeSession, type AuthSession } from '@/services/session';
+import { isMockMode } from '@/services/api';
 
 type SessionContextValue = {
   session: AuthSession | null;
@@ -17,7 +18,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    readSession().then(value => { if (active) setSession(value); })
+    const restored = isMockMode ? Promise.resolve(null) : readSession();
+    restored.then(value => { if (active) setSession(value); })
       .catch(() => { if (active) setError('Não foi possível recuperar a sessão neste dispositivo.'); })
       .finally(() => { if (active) setReady(true); });
     return () => { active = false; };

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { login } from '@/services/api';
+import { isMockMode, login } from '@/services/api';
 import { useSession } from '@/hooks/use-session';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -32,9 +32,12 @@ export default function LoginScreen() {
     setLoading(true);
     setMessage('');
     try {
-      const session = await login(email, password);
-      await dashboard.leaveDemo();
-      await signIn(session);
+      if (isMockMode) await dashboard.enterDemo();
+      else {
+        const session = await login(email, password);
+        await dashboard.leaveDemo();
+        await signIn(session);
+      }
       setPassword('');
       router.replace('/(preview)/treino');
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import { advanceWorkoutProgress, endWorkoutSession, startWorkoutSession } from '@/services/api';
 import type { DailyWorkout, WorkoutSession, ServerSession } from '@/utils/dashboard';
 
@@ -11,7 +11,13 @@ export type Practice = {
   serverSessionId?: string;
 };
 export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: boolean) {
-  const [practice, setPractice] = useState<Practice | null>(null);
+  const [practice, setPracticeState] = useState<Practice | null>(null);
+  const latestPractice = useRef<Practice | null>(null);
+  const setPractice = useCallback((value: SetStateAction<Practice | null>) => {
+    const next = typeof value === 'function' ? value(latestPractice.current) : value;
+    latestPractice.current = next;
+    setPracticeState(next);
+  }, []);
   const [summary, setSummary] = useState<WorkoutSession | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
@@ -26,7 +32,7 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     setError('');
     setPending(false);
     busy.current = false;
-  }, []);
+  }, [setPractice]);
 
   const restore = useCallback((saved: Practice | null, workout: DailyWorkout, savedAt: number) => {
     if (!saved || saved.workoutId !== workout.id || saved.durations.length !== workout.exercises.length
@@ -35,7 +41,7 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     const durations = [...saved.durations];
     if (saved.runningSince !== null) durations[saved.index] += Math.max(0, (savedAt - saved.runningSince) / 1000);
     setPractice({ ...saved, durations, runningSince: null });
-  }, []);
+  }, [setPractice]);
 
   const restoreServer = useCallback((saved: ServerSession, workout: DailyWorkout) => {
     if (saved.status !== 'active' || String(saved.dailyWorkoutId) !== workout.id) return;
@@ -45,7 +51,7 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
     setPractice({ workoutId: workout.id, serverSessionId: String(saved.id), index: next < 0 ? completed.length - 1 : next,
       completed, durations, runningSince: null });
     setError('');
-  }, []);
+  }, [setPractice]);
 
   useEffect(() => {
     if (!practice?.runningSince) return;
@@ -72,6 +78,7 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
         const result = await startWorkoutSession(workout.id);
         if (String(result.dailyWorkoutId) !== workout.id) throw new Error('O treino mudou no servidor. Atualize o treino antes de iniciar.');
         if (version !== generation.current) return false;
+        setSummary(null);
         restoreServer(result.session, workout);
         setPractice(current => current ? { ...current, runningSince: current.completed.every(Boolean) ? null : Date.now() } : current);
         setNow(Date.now());
@@ -137,20 +144,21 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
   }
 
   async function finish() {
-    if (!practice || !workout || busy.current) return null;
+    const current = latestPractice.current;
+    if (!current || !workout || busy.current) return null;
     busy.current = true;
     setPending(true);
     setError('');
     const version = generation.current;
-    const durations = measured(practice);
-    setPractice({ ...practice, durations, runningSince: null });
+    const durations = measured(current);
+    setPractice({ ...current, durations, runningSince: null });
     try {
       if (!demo) {
-        if (!practice.serverSessionId) throw new Error('Consulte o progresso para recuperar sua sessão.');
-        const interrupted = practice.completed[practice.index] ? undefined : {
-          exerciseOrder: workout.exercises[practice.index].order ?? practice.index + 1, durationSeconds: durations[practice.index],
+        if (!current.serverSessionId) throw new Error('Consulte o progresso para recuperar sua sessão.');
+        const interrupted = current.completed[current.index] ? undefined : {
+          exerciseOrder: workout.exercises[current.index].order ?? current.index + 1, durationSeconds: durations[current.index],
         };
-        const result = await endWorkoutSession(practice.serverSessionId, interrupted);
+        const result = await endWorkoutSession(current.serverSessionId, interrupted);
         if (version !== generation.current) return null;
         setSummary(result); setPractice(null);
         return result;
@@ -158,9 +166,9 @@ export function useWorkoutPractice(workout: DailyWorkout | undefined, demo: bool
       if (version !== generation.current) return null;
       const result: WorkoutSession = {
         id: `local-${Date.now()}`, title: workout.title, date: workout.date,
-        status: practice.completed.every(Boolean) ? 'completed' : 'ended',
+        status: current.completed.every(Boolean) ? 'completed' : 'ended',
         durationSeconds: durations.reduce((total, value) => total + value, 0),
-        exercises: workout.exercises.map((item, index) => ({ name: item.name, durationSeconds: durations[index], completed: practice.completed[index] })),
+        exercises: workout.exercises.map((item, index) => ({ name: item.name, durationSeconds: durations[index], completed: current.completed[index] })),
       };
       setSummary(result);
       setPractice(null);
